@@ -1,5 +1,5 @@
 // FieldDock field-test configuration.
-// Add the HTTPS PocketBase tunnel URL here after the tunnel is created.
+// This file is deliberately NOT cached by the FieldDock service worker.
 window.FIELDDOCK_CONFIG = {
   pocketBaseUrl: "https://api.fielddockapp.co.uk"
 };

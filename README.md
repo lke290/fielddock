@@ -1,4 +1,4 @@
-# FieldDock v4.12.0 — Field Test PWA
+# FieldDock v4.12.1 — Field Test PWA
 
 **Site information. In your pocket.**
 
@@ -8,7 +8,7 @@ This folder is the public GitHub Pages frontend only. It contains no PocketBase 
 Upload these files to the root of the `fielddock` repository. In GitHub open **Settings → Pages**, choose **Deploy from a branch**, then select **main** and **/(root)**.
 
 ## Backend configuration
-`config.js` intentionally ships with an empty `pocketBaseUrl`. After the secure HTTPS PocketBase tunnel is created, set it to the tunnel origin, for example:
+`config.js` is configured for the FieldDock PocketBase tunnel. v4.12.1 deliberately excludes this file from service-worker caching so backend configuration changes are picked up reliably:
 
 ```js
 window.FIELDDOCK_CONFIG = {
