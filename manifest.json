@@ -4,8 +4,8 @@
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#0b1220",
-  "theme_color": "#ff9138",
+  "background_color": "#111827",
+  "theme_color": "#c96f2d",
   "description": "FieldDock \u2014 Site information. In your pocket.",
   "icons": [
     {
