@@ -50,5 +50,5 @@ The current icons are retained from the stable build until the final FieldDock p
 - New FieldDock notebook app icons.
 
 
-## v4.15.1
-Glass UI release/hotfix built from v4.14.2. Uses the Option B transparent glass treatment and dedicated Projects tile navigation. v4.15.1 corrects the v4.15.0 startup white-screen caused by UI code being inserted into an HTML template literal.
+## v4.15.2
+Glass UI release/hotfix built from v4.14.2. Uses the Option B transparent glass treatment and dedicated Projects tile navigation. v4.15.2 corrects the v4.15.0 startup white-screen caused by UI code being inserted into an HTML template literal.
