@@ -68,3 +68,10 @@ UI/permissions polish: lighter light-mode header/navigation glass, Joiner projec
 - Light mode only: paler frosted header, project strip, Site/Tools controls and menu button.
 - Dark mode styling intentionally unchanged.
 - Removed stray literal escaped-newline text that could render at the bottom of the page.
+
+
+## v4.15.7
+- Polished the Orders form for phone use.
+- Notes is now a full-width, multi-line editor with a useful default height and normal text wrapping.
+- Kept vertical resizing available for larger notes.
+- Bumped the PWA shell cache to v4.15.7.
