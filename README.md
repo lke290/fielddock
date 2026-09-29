@@ -1,79 +1,72 @@
-FieldDock v4.15.9 — Navigation History (clean rebuild)
+FieldDock v4.16.0 — Safe Project Deletion
+=========================================
 
-# FieldDock v4.14.2 — Field Test PWA
+Based on the stable v4.15.9 navigation-history build.
 
-**Site information. In your pocket.**
+New project lifecycle
+---------------------
+- Active and Archived projects now have a deliberately low-prominence Delete project action for Supervisor/Admin accounts.
+- Deletion requires BOTH typing DELETE and re-entering the signed-in user's current PocketBase password.
+- The password is re-authenticated against PocketBase; FieldDock does not store it.
+- Confirmed deletions become Recently Deleted for 24 hours rather than being removed immediately.
+- Recently Deleted projects are hidden from normal project switching and cannot remain the active project.
+- Recently Deleted shows who requested deletion, when it was requested, and the remaining recovery time.
+- Restore project cancels deletion without requiring the password again.
+- A server-side PocketBase cron hook permanently removes expired projects and their project-owned records/files.
 
-This folder is the public GitHub Pages frontend only. It contains no PocketBase database, migrations, uploaded project files, or credentials.
+PocketBase schema additions REQUIRED before testing deletion
+-----------------------------------------------------------
+In the existing `projects` collection add these fields in PocketBase Admin:
 
-## GitHub Pages
-Upload these files to the root of the `fielddock` repository. In GitHub open **Settings → Pages**, choose **Deploy from a branch**, then select **main** and **/(root)**.
+1. pending_delete
+   Type: Bool
+   Required: No
+   Default: false
 
-## Backend configuration
-`config.js` is configured for the FieldDock PocketBase tunnel. v4.14.2 deliberately excludes this file from service-worker caching so backend configuration changes are picked up reliably:
+2. delete_after
+   Type: Date
+   Required: No
 
-```js
-window.FIELDDOCK_CONFIG = {
-  pocketBaseUrl: "https://your-secure-pocketbase-host.example"
-};
-```
+3. deletion_requested_at
+   Type: Date
+   Required: No
 
-Do not put passwords, PocketBase admin credentials, API tokens, database files, or project documents in this repository.
+4. deletion_requested_by
+   Type: Text
+   Required: No
 
-## Field-test behaviour
-- Installable PWA metadata is configured for GitHub Pages project hosting.
-- The header reports Online / Offline / Connecting / Backend not configured.
-- Writes are not queued while offline; the app tells the user the change was not sent.
-- Existing authentication storage key is deliberately retained for compatibility.
+Do not change the existing collection API rules just for this feature. FieldDock already uses the project's existing update permission path.
 
-The current icons are retained from the stable build until the final FieldDock production icon assets are exported.
+Server cleanup hook
+-------------------
+Copy:
+  pb_hooks/fielddock_project_cleanup.pb.js
+into the `pb_hooks` directory beside your PocketBase executable.
 
-## v4.14.2 field-test fixes
-- Dashboard door/schedule search now uses compact navigation results; **Open** jumps to and expands the matching completion record instead of rendering the full record inside the search card.
-- Completion-list filtering now uses the same normalised room terminology and handles zero-padded room numbers (for example `Bed 1` matches `Bedroom 01`).
-- Door photo refresh requests bypass browser/proxy caches so newly uploaded evidence is requested immediately.
-- Personal notes reload from PocketBase with an explicit current-user filter and no-cache request after a fresh sign-in; private note state is cleared on sign-out.
+The hook checks once per hour (at minute 7) and permanently removes projects whose 24-hour recovery deadline has passed. It removes project-owned records from:
+- door_photos
+- site_item_photos
+- completion_records
+- documents
+- drawings
+- personal_notes
+- project_members
+- schedule_records
+and finally deletes the project itself.
 
+IMPORTANT: test this against the old FieldDock test projects before using it on real jobs. Keep a PocketBase backup before the first permanent-deletion test.
 
-## v4.14.2 search navigator
-- Search result rows are fully tappable; separate Open buttons removed.
-- Exact room/door searches no longer include partial numeric matches such as Bed 30 for Bed 3.
-- Large door result sets are grouped by count and open the Completion List with a temporary filter.
-- Guidance remains visible as its own result category.
-
-
-## v4.14.2 mobile UI
-- Phone-first dashboard navigation tiles.
-- Supervisor Projects button and role-aware project switcher.
-- Grouped Project Files & Imports and Project Management sections.
-- Compact saved-notes index.
-- Formula toolbox grid.
-- Light/Dark only; FieldDock orange fixed.
-- New FieldDock notebook app icons.
-
-
-## v4.15.3
-Glass UI release/hotfix built from v4.14.2. Uses the Option B transparent glass treatment and dedicated Projects tile navigation. v4.15.3 corrects the v4.15.0 startup white-screen caused by UI code being inserted into an HTML template literal.
-
-
-## v4.15.4
-UI/permissions polish: lighter light-mode header/navigation glass, Joiner project-management launcher tiles hidden while PocketBase permissions remain authoritative, Site/Tools dropdown labels remain visible after navigation, and subtle orange tile outline/glow with a 2px tactile lift on interaction.
-
-
-## v4.15.6
-- Fixed Site/Tools active dropdown labels becoming dark/invisible on the glass header.
-- Fixed Joiner Projects launcher tiles remaining visible by binding the launcher directly to the same canManageProject() permission used by the underlying project panels.
-- Retains v4.15.4 light-header and tactile orange tile interaction polish.
-
-
-## v4.15.6
-- Light mode only: paler frosted header, project strip, Site/Tools controls and menu button.
-- Dark mode styling intentionally unchanged.
-- Removed stray literal escaped-newline text that could render at the bottom of the page.
-
-
-## v4.15.7
-- Polished the Orders form for phone use.
-- Notes is now a full-width, multi-line editor with a useful default height and normal text wrapping.
-- Kept vertical resizing available for larger notes.
-- Bumped the PWA shell cache to v4.15.7.
+Suggested first test
+--------------------
+1. Add the four project fields above.
+2. Install the cleanup hook and restart PocketBase if necessary.
+3. Deploy the v4.16.0 frontend.
+4. Sign in as Supervisor/Admin.
+5. Open Projects and choose one disposable test project.
+6. Press Delete project.
+7. Confirm the correct project name is shown.
+8. Verify the button remains disabled until DELETE and a password are entered.
+9. Enter a wrong password first — deletion must be rejected.
+10. Enter the correct password — project should move to Recently Deleted.
+11. Restore it — it should return intact to Active projects.
+12. Delete it again. For the final server cleanup test, either wait for expiry or temporarily change its delete_after value in PocketBase Admin to a time in the past, then trigger/wait for the cron.
