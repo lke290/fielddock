@@ -52,3 +52,7 @@ The current icons are retained from the stable build until the final FieldDock p
 
 ## v4.15.3
 Glass UI release/hotfix built from v4.14.2. Uses the Option B transparent glass treatment and dedicated Projects tile navigation. v4.15.3 corrects the v4.15.0 startup white-screen caused by UI code being inserted into an HTML template literal.
+
+
+## v4.15.4
+UI/permissions polish: lighter light-mode header/navigation glass, Joiner project-management launcher tiles hidden while PocketBase permissions remain authoritative, Site/Tools dropdown labels remain visible after navigation, and subtle orange tile outline/glow with a 2px tactile lift on interaction.
