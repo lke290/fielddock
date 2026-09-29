@@ -58,7 +58,13 @@ Glass UI release/hotfix built from v4.14.2. Uses the Option B transparent glass 
 UI/permissions polish: lighter light-mode header/navigation glass, Joiner project-management launcher tiles hidden while PocketBase permissions remain authoritative, Site/Tools dropdown labels remain visible after navigation, and subtle orange tile outline/glow with a 2px tactile lift on interaction.
 
 
-## v4.15.5
+## v4.15.6
 - Fixed Site/Tools active dropdown labels becoming dark/invisible on the glass header.
 - Fixed Joiner Projects launcher tiles remaining visible by binding the launcher directly to the same canManageProject() permission used by the underlying project panels.
 - Retains v4.15.4 light-header and tactile orange tile interaction polish.
+
+
+## v4.15.6
+- Light mode only: paler frosted header, project strip, Site/Tools controls and menu button.
+- Dark mode styling intentionally unchanged.
+- Removed stray literal escaped-newline text that could render at the bottom of the page.
