@@ -75,3 +75,10 @@ UI/permissions polish: lighter light-mode header/navigation glass, Joiner projec
 - Notes is now a full-width, multi-line editor with a useful default height and normal text wrapping.
 - Kept vertical resizing available for larger notes.
 - Bumped the PWA shell cache to v4.15.7.
+
+
+## v4.15.8
+- Added browser/PWA navigation history so Android Back returns through FieldDock screens before exiting.
+- Project management tools and individual Formula tools now count as navigation steps.
+- Collapsible cards/details do not create history entries.
+- Bumped the PWA shell cache to v4.15.8.
