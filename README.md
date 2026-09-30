@@ -70,3 +70,10 @@ Suggested first test
 10. Enter the correct password — project should move to Recently Deleted.
 11. Restore it — it should return intact to Active projects.
 12. Delete it again. For the final server cleanup test, either wait for expiry or temporarily change its delete_after value in PocketBase Admin to a time in the past, then trigger/wait for the cron.
+
+## v4.17.0 — User & Invitation Foundation
+- Adds Admin as a first-class role while preserving Supervisor and Joiner behavior.
+- Login now presents Username or email; PocketBase identity authentication handles either.
+- Admin sees an account directory inside Team & Access.
+- Keeps the tested v4.16.0 safe-deletion workflow and packages the corrected cleanup hook including audit_log and schedule_imports.
+- Invitation creation, account disable/reset actions and role changes are intentionally deferred to the next tested pass.
