@@ -78,7 +78,7 @@ Suggested first test
 - Keeps the tested v4.16.0 safe-deletion workflow and packages the corrected cleanup hook including audit_log and schedule_imports.
 - Invitation creation, account disable/reset actions and role changes are intentionally deferred to the next tested pass.
 
-## v4.18.0 — Secure invitations
+## v4.18.1 — Secure invitations
 - Adds a Supervisor/Admin invitation UI with 48-hour, single-use links.
 - Supervisors can invite Joiners only; Admins can invite Joiner/Supervisor/Admin accounts.
 - Optional project assignment is stored in the invite and applied server-side on redemption.
@@ -86,3 +86,9 @@ Suggested first test
 - New users choose a username, display name and password. FieldDock creates a private internal email value because the current PocketBase users schema still requires the system email field; users do not need to supply a personal email.
 - Redeemed invites are marked used with used_at, and cannot be replayed.
 - Install pb_hooks/fielddock_user_invites.pb.js alongside the existing project cleanup hook.
+
+
+## v4.18.1 — Invitation screen visibility fix
+- Fixed the Join FieldDock invitation screen appearing during normal app use.
+- Shared login-screen styling now correctly hides invitation UI unless an invite token is present.
+- No database schema or invitation API changes from v4.18.0.
