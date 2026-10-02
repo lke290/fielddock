@@ -92,3 +92,8 @@ Suggested first test
 - Fixed the Join FieldDock invitation screen appearing during normal app use.
 - Shared login-screen styling now correctly hides invitation UI unless an invite token is present.
 - No database schema or invitation API changes from v4.18.0.
+
+
+## v4.18.4
+- Closes hamburger, account and appearance overlays whenever navigating to another FieldDock page.
+- Retains the v4.18.3 dashboard flow correction and v4.18.2 regression fixes.
