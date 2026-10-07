@@ -1,0 +1,1 @@
+FieldDock v4.19.4 — corrected compact Drawings UI. Built directly from known-good v4.19.2. No PocketBase schema/security changes.
