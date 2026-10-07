@@ -501,7 +501,21 @@ html:not([data-theme='dark']) #regulationReferencesPanel > summary.collapsible-h
 .photo-source-actions{display:flex;gap:8px;flex-wrap:wrap;padding:7px 0 2px}
 .photo-source-actions .btn{min-height:42px;padding:8px 12px}
 </style>
-</head><body><header class='top'><div class='top-main'><div class='brand-home' id='brandHome' role='button' tabindex='0' aria-label='Open dashboard'><h1>FieldDock</h1><div class='top-sub'>Site information. In your pocket. • v4.19.1</div></div><div class='top-actions'><button type='button' class='header-menu-btn' id='headerMenuBtn' aria-label='Open user menu' aria-expanded='false'>☰</button><div class='header-menu-panel' id='headerMenuPanel'><button type='button' class='header-menu-item' id='accountBtn'>👤 Account</button><button type='button' class='header-menu-item' id='appearanceBtn'>◐ Light / Dark</button><button type='button' class='header-menu-item' id='projectsMenuBtn'>▦ Projects</button><button type='button' class='header-menu-item' id='installAppBtn' style='display:none'>⬇ Install app</button></div></div></div><div class='header-project'><div id='dashboardProject'></div><div class='syncbar'><span class='sync-pill local' id='syncState'>● PocketBase</span><span class='small' id='currentUserLabel'></span></div><div class='customise'><button class='btn primary' type='button' id='dashboardProjects'>Projects</button></div></div><nav class='tabs'><select id='listMenu' class='calc-menu' aria-label='Site menu'><option value='' selected disabled>Site</option><option value='notes'>Notes</option><option value='orders'>Orders</option><option value='calendar'>Calendar</option></select><select id='siteMenu' class='calc-menu' aria-label='Tools menu'><option value='' selected disabled>Tools</option><option value='convert'>Conversions</option><option value='formula'>Formulas</option><option value='regs'>Regulations &amp; Guidance</option></select></nav></header><div id='inviteScreen' class='login-screen hidden'><div class='login-card'><h1>Join FieldDock</h1><p class='small' id='inviteSummary'>Checking invitation…</p><label>Username<input id='inviteUsername' type='text' autocomplete='username' placeholder='e.g. jsmith'></label><label>Display name<input id='inviteDisplayName' type='text' autocomplete='name' placeholder='e.g. John Smith'></label><label>Password<input id='invitePassword' type='password' autocomplete='new-password' placeholder='At least 8 characters'></label><label>Confirm password<input id='invitePasswordConfirm' type='password' autocomplete='new-password' placeholder='Repeat password'></label><button type='button' class='btn primary' id='acceptInviteBtn' style='width:100%;margin-top:12px'>Create FieldDock account</button><p class='small' id='inviteStatus' style='margin-top:12px'></p></div></div><div id='loginScreen' class='login-screen'><div class='login-card'><h1>FieldDock</h1><p class='small'><b>Site information. In your pocket.</b></p><p class='small'>Sign in to open your projects.</p><label>Username or email<input id='loginEmail' type='text' autocomplete='username' placeholder='e.g. luke'></label><label>Password<input id='loginPassword' type='password' placeholder='••••••••'></label><button type='button' class='btn primary' id='signInBtn' style='width:100%;margin-top:12px'>Sign in</button><p class='small' style='margin-top:12px'>Sign in with your FieldDock username and password. Email login remains available during migration.</p></div></div><div id='accountPanel' class='account-panel'><h3>Account</h3><div id='accountSummary' class='small'></div><button type='button' class='btn' id='signOutBtn' style='margin-top:10px'>Sign out</button></div><div class='appearance-panel' id='appearancePanel'><h3>Light / Dark</h3><div class='small'>FieldDock orange stays fixed in both modes.</div><div class='appearance-row'><button type='button' data-theme-choice='light'>☀ Light</button><button type='button' data-theme-choice='dark'>☾ Dark</button></div></div><main class='wrap'>
+
+<style id="v4192-view-mode-ui">
+.view-mode-menu{padding:4px 0 10px;margin-bottom:6px;border-bottom:1px solid var(--line)}
+.view-mode-label{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:800;margin:0 0 7px 2px}
+.view-mode-switch{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.view-mode-switch button{border:1px solid var(--line);background:var(--surface2);color:var(--text);border-radius:9px;padding:9px 7px;font-weight:800;font-size:.78rem}
+.view-mode-switch button.selected{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset;background:color-mix(in srgb,var(--accent) 12%,var(--surface2))}
+html[data-supervisor-view='site'] .drawing-category-edit,
+html[data-supervisor-view='site'] .drawing-delete,
+html[data-supervisor-view='site'] .shared-guide-delete,
+html[data-supervisor-view='site'] .shared-guide-edit,
+html[data-supervisor-view='site'] .management-controls{display:none!important}
+</style>
+
+</head><body><header class='top'><div class='top-main'><div class='brand-home' id='brandHome' role='button' tabindex='0' aria-label='Open dashboard'><h1>FieldDock</h1><div class='top-sub'>Site information. In your pocket. • v4.19.2</div></div><div class='top-actions'><button type='button' class='header-menu-btn' id='headerMenuBtn' aria-label='Open user menu' aria-expanded='false'>☰</button><div class='header-menu-panel' id='headerMenuPanel'><div class='view-mode-menu' id='viewModeMenu' hidden><div class='view-mode-label'>Supervisor view</div><div class='view-mode-switch' role='group' aria-label='Supervisor view mode'><button type='button' id='siteViewBtn' data-view-mode='site'>🔨 Site View</button><button type='button' id='managementViewBtn' data-view-mode='management'>⚙ Management</button></div></div><button type='button' class='header-menu-item' id='accountBtn'>👤 Account</button><button type='button' class='header-menu-item' id='appearanceBtn'>◐ Light / Dark</button><button type='button' class='header-menu-item' id='projectsMenuBtn'>▦ Projects</button><button type='button' class='header-menu-item' id='installAppBtn' style='display:none'>⬇ Install app</button></div></div></div><div class='header-project'><div id='dashboardProject'></div><div class='syncbar'><span class='sync-pill local' id='syncState'>● PocketBase</span><span class='small' id='currentUserLabel'></span></div><div class='customise'><button class='btn primary' type='button' id='dashboardProjects'>Projects</button></div></div><nav class='tabs'><select id='listMenu' class='calc-menu' aria-label='Site menu'><option value='' selected disabled>Site</option><option value='notes'>Notes</option><option value='orders'>Orders</option><option value='calendar'>Calendar</option></select><select id='siteMenu' class='calc-menu' aria-label='Tools menu'><option value='' selected disabled>Tools</option><option value='convert'>Conversions</option><option value='formula'>Formulas</option><option value='regs'>Regulations &amp; Guidance</option></select></nav></header><div id='inviteScreen' class='login-screen hidden'><div class='login-card'><h1>Join FieldDock</h1><p class='small' id='inviteSummary'>Checking invitation…</p><label>Username<input id='inviteUsername' type='text' autocomplete='username' placeholder='e.g. jsmith'></label><label>Display name<input id='inviteDisplayName' type='text' autocomplete='name' placeholder='e.g. John Smith'></label><label>Password<input id='invitePassword' type='password' autocomplete='new-password' placeholder='At least 8 characters'></label><label>Confirm password<input id='invitePasswordConfirm' type='password' autocomplete='new-password' placeholder='Repeat password'></label><button type='button' class='btn primary' id='acceptInviteBtn' style='width:100%;margin-top:12px'>Create FieldDock account</button><p class='small' id='inviteStatus' style='margin-top:12px'></p></div></div><div id='loginScreen' class='login-screen'><div class='login-card'><h1>FieldDock</h1><p class='small'><b>Site information. In your pocket.</b></p><p class='small'>Sign in to open your projects.</p><label>Username or email<input id='loginEmail' type='text' autocomplete='username' placeholder='e.g. luke'></label><label>Password<input id='loginPassword' type='password' placeholder='••••••••'></label><button type='button' class='btn primary' id='signInBtn' style='width:100%;margin-top:12px'>Sign in</button><p class='small' style='margin-top:12px'>Sign in with your FieldDock username and password. Email login remains available during migration.</p></div></div><div id='accountPanel' class='account-panel'><h3>Account</h3><div id='accountSummary' class='small'></div><button type='button' class='btn' id='signOutBtn' style='margin-top:10px'>Sign out</button></div><div class='appearance-panel' id='appearancePanel'><h3>Light / Dark</h3><div class='small'>FieldDock orange stays fixed in both modes.</div><div class='appearance-row'><button type='button' data-theme-choice='light'>☀ Light</button><button type='button' data-theme-choice='dark'>☾ Dark</button></div></div><main class='wrap'>
 <section id='calc' class='panel'><div class='card'><h2>Build your calculator page</h2><p class='small'>Mix calculators and formula tools on one page. Add or remove tools whenever the job changes; your layout is saved on this device.</p><div class='customise'><button type='button' class='btn primary' id='customiseCalc'>Customise tools</button><button type='button' class='btn' id='showAllCalc'>Add all</button><button type='button' class='btn' id='clearCalc'>Clear page</button></div><div class='saved-layout-row'><select id='savedLayout' aria-label='Saved custom layouts'><option value=''>Saved custom layouts…</option></select><button type='button' class='btn' id='saveLayout'>Save current</button><button type='button' class='btn' id='deleteLayout'>Delete</button></div><p class='small'>Use the Calculators drop-down above for 1st Fix, 2nd Fix, Roofing, Stairs, Workshop or Favourites. Save your own named toolbox here.</p><div id='calcChooser' style='display:none;margin-top:10px'><div class='grid'><div><h3>Calculators</h3><div id='calculatorChoices' class='builder-list'></div></div><div><h3>Formula calculators</h3><div id='formulaChoices' class='builder-list'></div></div></div></div></div><div id='customCalcArea'><div class='card calc-card' data-calc='diagonal'><h2>Diagonal / squaring</h2><div class='grid'><label>Length (mm)<input id='diagA' type='number' value='3000'></label><label>Width (mm)<input id='diagB' type='number' value='4000'></label></div><div class='result' id='diagOut'></div></div><div class='card calc-card' data-calc='spacing'><h2>Equal spacing</h2><div class='grid'><label>Overall length (mm)<input id='spaceL' type='number' value='2400'></label><label>Number of spaces<input id='spaceN' type='number' value='5' min='1'></label></div><div class='result' id='spaceOut'></div></div><div class='card calc-card' data-calc='rafter'><h2>Roof / rafter</h2><div class='grid'><label>Horizontal run (mm)<input id='run' type='number' value='3000'></label><label>Pitch (degrees)<input id='pitch' type='number' value='30'></label></div><div class='result' id='rafterOut'></div><p class='small'>Geometric length only; allowances for ridge, birdsmouth, overhang and construction details are project-specific.</p></div><div class='card calc-card' data-calc='sheets'><h2>Sheet estimator</h2><div class='grid'><label>Area (m²)<input id='area' type='number' value='25' step='.1'></label><label>Sheet width (mm)<input id='sw' type='number' value='1220'></label><label>Sheet length (mm)<input id='sl' type='number' value='2440'></label><label>Waste (%)<input id='waste' type='number' value='10'></label></div><div class='result' id='sheetOut'></div></div></div></section>
 <section id='notes' class='panel'><div class='tool-page-header'><span>Notes</span></div>
 <div class='card'><div class='record-header'><div><h2 style='margin:0'>Site notes</h2><p class='small' style='margin:6px 0 0'>Project notes are shared with the project team. Personal notes remain private to your account.</p></div><div class='customise'><button type='button' class='btn primary management-controls' id='projectNoteNewTop'>+ Project Note</button><button type='button' class='btn' id='siteNoteNewTop'>+ Personal Note</button></div></div><h3 style='margin-top:18px'>Saved notes</h3><div id='siteNoteList'></div></div>
@@ -591,7 +605,7 @@ Bedroom 1 - 3 curtain battens missing'></textarea></label><div class='customise'
 <div class='card reg'><h2>💧 Moisture</h2><p><b>Source:</b> Approved Document C • <b>Checked:</b> 25 Sep 2026</p><p>Quick route for site preparation and resistance to contaminants and moisture; relevant to timber at damp-sensitive interfaces.</p><p><a href='https://www.gov.uk/government/collections/approved-documents' target='_blank'>Open Approved Documents index</a></p></div>
 <div class='card reg'><h2>🧱 Cavity barriers & fire stopping</h2><p><b>Source:</b> Approved Document B • <b>Checked:</b> 25 Sep 2026</p><p>Reference for cavity barriers, fire-stopping and maintaining compartmentation around construction and service penetrations.</p><p><a href='https://www.gov.uk/government/publications/fire-safety-approved-document-b' target='_blank'>Open current Approved Document B</a></p></div>
 <div class='card reg'><h2>Version note</h2><p>Approved Document B has amendments taking effect on <b>30 Sep 2026</b> subject to transitional provisions. F and L also have 2026 editions with their own commencement/transitional arrangements. Always open the source before treating a card as current for a live job.</p></div></div></details></section>
-<footer>FieldDock v4.19.1 • Calculations are aids, not substitutes for drawings, specifications, competent design or statutory guidance.</footer></main><script src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'></script><script src='https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'></script><script>
+<footer>FieldDock v4.19.2 • Calculations are aids, not substitutes for drawings, specifications, competent design or statutory guidance.</footer></main><script src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'></script><script src='https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'></script><script>
 // v4.9.48: measure the fixed banner/nav instead of relying on guessed heights.
 (function(){
   function syncFixedHeaderHeights(){
@@ -1907,13 +1921,17 @@ $('drawingFile')?.addEventListener('change',async e=>{let f=e.target.files?.[0],
 const _renderDashboard=renderDashboard;renderDashboard=function(){_renderDashboard();renderDrawings()};
 
 
-// v4.19.1 — single reliable hamburger closer used by every header-menu action.
+// v4.19.2 — single reliable hamburger closer used by every header-menu action.
 function closeHeaderMenu(){
   const menu=document.getElementById('headerMenuPanel');
   const btn=document.getElementById('headerMenuBtn');
   menu?.classList.remove('open');
   btn?.setAttribute('aria-expanded','false');
 }
+
+$('siteViewBtn')?.addEventListener('click',()=>setSupervisorViewMode('site'));
+$('managementViewBtn')?.addEventListener('click',()=>setSupervisorViewMode('management'));
+applySupervisorViewMode();
 
 const APPEARANCE_KEY='joinersRefAppearanceV21';
 function appearanceSettings(){try{let a=Object.assign({theme:'dark'},JSON.parse(localStorage.getItem(APPEARANCE_KEY)||'{}'));a.accent='orange';return a}catch(e){return {theme:'dark',accent:'orange'}}}
@@ -1925,7 +1943,7 @@ document.querySelectorAll('[data-theme-choice]').forEach(b=>b.addEventListener('
 document.querySelectorAll('.accent-dot').forEach(b=>b.addEventListener('click',()=>saveAppearance({accent:b.dataset.accent})));
 document.addEventListener('click',e=>{let p=document.getElementById('appearancePanel'),b=document.getElementById('appearanceBtn');if(p?.classList.contains('open')&&!p.contains(e.target)&&!b?.contains(e.target))p.classList.remove('open')});
 
-document.querySelectorAll('input,select').forEach(i=>i.addEventListener('input',calc));document.querySelectorAll('input').forEach(i=>i.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();calc();i.blur();}}));document.querySelectorAll('select').forEach(i=>i.addEventListener('change',calc));calc();let deferredInstallPrompt=null;window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredInstallPrompt=e;if($('installAppBtn'))$('installAppBtn').style.display='inline-flex'});$('installAppBtn')?.addEventListener('click',async()=>{if(!deferredInstallPrompt){alert('Install is not available in this browser yet. On a phone, use the browser menu and choose Add to Home screen / Install app.');return}deferredInstallPrompt.prompt();await deferredInstallPrompt.userChoice;deferredInstallPrompt=null;$('installAppBtn').style.display='none'});window.addEventListener('appinstalled',()=>{if($('installAppBtn'))$('installAppBtn').style.display='none'});if('serviceWorker'in navigator&&window.isSecureContext)navigator.serviceWorker.register('sw.js?v=4.18.7',{updateViaCache:'none'}).catch(e=>console.warn('Service worker unavailable',e));
+document.querySelectorAll('input,select').forEach(i=>i.addEventListener('input',calc));document.querySelectorAll('input').forEach(i=>i.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();calc();i.blur();}}));document.querySelectorAll('select').forEach(i=>i.addEventListener('change',calc));calc();let deferredInstallPrompt=null;window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredInstallPrompt=e;if($('installAppBtn'))$('installAppBtn').style.display='inline-flex'});$('installAppBtn')?.addEventListener('click',async()=>{if(!deferredInstallPrompt){alert('Install is not available in this browser yet. On a phone, use the browser menu and choose Add to Home screen / Install app.');return}deferredInstallPrompt.prompt();await deferredInstallPrompt.userChoice;deferredInstallPrompt=null;$('installAppBtn').style.display='none'});window.addEventListener('appinstalled',()=>{if($('installAppBtn'))$('installAppBtn').style.display='none'});if('serviceWorker'in navigator&&window.isSecureContext)navigator.serviceWorker.register('sw.js?v=4.19.2',{updateViaCache:'none'}).catch(e=>console.warn('Service worker unavailable',e));
 // v4.0 PocketBase authentication + project loading
 const PB_BASE = String(window.FIELDDOCK_CONFIG?.pocketBaseUrl || ((location.hostname==='localhost'||location.hostname==='127.0.0.1'||location.hostname.startsWith('192.168.')) ? location.origin : '')).replace(/\/$/,'');
 function setConnectionState(state){const el=document.getElementById('syncState');if(!el)return;const labels={online:'● Online',offline:'● Offline',connecting:'● Connecting…',unconfigured:'● Backend not configured'};el.textContent=labels[state]||labels.connecting;el.classList.toggle('local',state!=='online');}
@@ -1958,6 +1976,22 @@ function roleLabel(role){role=String(role||'').trim().toLowerCase();return role=
 function isGlobalSupervisor(){return ['supervisor','admin / project manager','admin','project manager'].includes(authRole())}
 let pbMemberships=[];
 function membershipFor(projectId){return pbMemberships.find(m=>String(m.project)===String(projectId)&&String(m.user)===String(pbAuth()?.record?.id))||null}
+const SUPERVISOR_VIEW_KEY='fielddockSupervisorViewV1';
+function supervisorViewMode(){return localStorage.getItem(SUPERVISOR_VIEW_KEY)==='site'?'site':'management'}
+function managementUIEnabled(){return !isGlobalSupervisor()||supervisorViewMode()==='management'}
+function applySupervisorViewMode(){
+  const eligible=isGlobalSupervisor(),mode=eligible?supervisorViewMode():'management';
+  document.documentElement.dataset.supervisorView=eligible?mode:'joiner';
+  const wrap=$('viewModeMenu');if(wrap)wrap.hidden=!eligible;
+  document.querySelectorAll('[data-view-mode]').forEach(b=>b.classList.toggle('selected',eligible&&b.dataset.viewMode===mode));
+}
+function setSupervisorViewMode(mode){
+  if(!isGlobalSupervisor())return;
+  localStorage.setItem(SUPERVISOR_VIEW_KEY,mode==='site'?'site':'management');
+  applySupervisorViewMode();applyPermissionsUI();renderDashboard();
+  if($('drawings')?.classList.contains('active'))renderDrawings();
+  closeHeaderMenu();
+}
 function canManageProject(projectId=projectsData().active){let m=membershipFor(projectId);return isGlobalSupervisor()||m?.role==='supervisor'}
 function canUseProject(projectId=projectsData().active){return canManageProject(projectId)||!!membershipFor(projectId)}
 async function syncMemberships(){
@@ -1965,24 +1999,25 @@ async function syncMemberships(){
   try{let data=await pbRequest('/api/collections/project_members/records?perPage=500');pbMemberships=data.items||[]}catch(e){pbMemberships=[];console.warn('Membership sync unavailable',e)}
 }
 function applyPermissionsUI(){
-  const manage=canManageProject();document.querySelectorAll('.calendar-add-event').forEach(el=>el.style.display=manage?'':'none');document.querySelectorAll('.management-controls').forEach(el=>el.style.display=manage?'':'none');
-  if($('inviteUserPanel'))$('inviteUserPanel').style.display=isGlobalSupervisor()?'':'none';
+  applySupervisorViewMode();
+  const manage=canManageProject()&&managementUIEnabled(),globalManage=isGlobalSupervisor()&&managementUIEnabled();document.querySelectorAll('.calendar-add-event').forEach(el=>el.style.display=manage?'':'none');document.querySelectorAll('.management-controls').forEach(el=>el.style.display=manage?'':'none');
+  if($('inviteUserPanel'))$('inviteUserPanel').style.display=globalManage?'':'none';
   if($('inviteRole')){const admin=isAdmin();$('inviteRole').querySelectorAll('option').forEach(o=>{if(o.value!=='joiner')o.hidden=!admin});if(!admin&&$('inviteRole').value!=='joiner')$('inviteRole').value='joiner';}
   ['projectDetailsPanel','addSchedulePanel','projectFileImportsPanel','documentRegisterPanel','projectTeamPanel'].forEach(id=>{let el=$(id);if(el)el.style.display=manage?'':'none'});
   // Completion exports/reports are supervisor workflow; joiners record the underlying completion data.
   ['exportCompletionCsv','exportFrameReport','exportDoorReport','exportIronmongeryReport'].forEach(id=>{let el=$(id);if(el)el.style.display=manage?'':'none'});
   // Project management menu is supervisor-only; the header Switch project button remains for everyone.
-  if($('projectsMenuBtn'))$('projectsMenuBtn').style.display=isGlobalSupervisor()?'':'none';
-  if($('sharedGuideAdd'))$('sharedGuideAdd').style.display=isGlobalSupervisor()?'':'none';
+  if($('projectsMenuBtn'))$('projectsMenuBtn').style.display=globalManage?'':'none';
+  if($('sharedGuideAdd'))$('sharedGuideAdd').style.display=globalManage?'':'none';
   // Operational users don't need administrative/diagnostic dashboard panels. Actions are still recorded in the audit trail.
-  ['auditTrailPanel','cloudStatusPanel','currentSchedulePanel'].forEach(id=>{let el=$(id);if(el)el.style.display=isGlobalSupervisor()?'':'none'});
+  ['auditTrailPanel','cloudStatusPanel','currentSchedulePanel'].forEach(id=>{let el=$(id);if(el)el.style.display=globalManage?'':'none'});
   // Joiners get a private notebook only; list processing/import remains a supervisor workflow.
   ['siteListImportPanel','currentSiteListPanel'].forEach(id=>{let el=$(id);if(el)el.style.display=manage?'':'none'});
   if($('siteNoteProcess'))$('siteNoteProcess').style.display=manage?'':'none';
-  if($('showArchivedProjects'))$('showArchivedProjects').style.display=isGlobalSupervisor()?'':'none';
-  if($('showDeletedProjects'))$('showDeletedProjects').style.display=isGlobalSupervisor()?'':'none';
-  if(!isGlobalSupervisor()&&projectArchiveView!=='active')projectArchiveView='active';
-  ['sharedGuideFile','sharedGuideTitle','sharedGuideType','sharedGuideRevision','sharedGuideKeywords'].forEach(id=>{let el=$(id);if(el)el.closest('label')?.style.setProperty('display',isGlobalSupervisor()?'':'none')});
+  if($('showArchivedProjects'))$('showArchivedProjects').style.display=globalManage?'':'none';
+  if($('showDeletedProjects'))$('showDeletedProjects').style.display=globalManage?'':'none';
+  if(!globalManage&&projectArchiveView!=='active')projectArchiveView='active';
+  ['sharedGuideFile','sharedGuideTitle','sharedGuideType','sharedGuideRevision','sharedGuideKeywords'].forEach(id=>{let el=$(id);if(el)el.closest('label')?.style.setProperty('display',globalManage?'':'none')});
 }
 
 // v4.9.22: removed the v4.9.21 link-repair shim. The original Roundhay project remains authoritative.
@@ -2129,7 +2164,7 @@ if(pbAuth()?.token&&!inviteMode)syncPocketBaseProjects().then(()=>renderDashboar
   });
 })();
 
-// v4.19.1 — close the hamburger shell before any menu action opens its own panel.
+// v4.19.2 — close the hamburger shell before any menu action opens its own panel.
 document.addEventListener('click',(e)=>{
   if(!e.target.closest?.('#headerMenuPanel .header-menu-item'))return;
   document.getElementById('headerMenuPanel')?.classList.remove('open');
@@ -2390,7 +2425,7 @@ html{scroll-padding-top:calc(var(--app-header-height,150px) + 12px)}
  #dashboard .dashboard-tile-grid{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:12px!important;margin:0 0 12px!important}
  #dashboard .dashboard-nav-tile{display:flex!important;visibility:visible!important;position:relative!important;min-width:0!important}
 }
-\n/* v4.19.1 phone-first UI cleanup */
+\n/* v4.19.2 phone-first UI cleanup */
 @media(max-width:700px){
  .tabs{grid-template-columns:repeat(2,minmax(0,1fr))!important;column-gap:10px!important;padding:0!important}
  .tabs .calc-menu{box-sizing:border-box!important;margin:0!important;padding:10px 30px 10px 11px!important}
