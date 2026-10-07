@@ -1,4 +1,4 @@
-const CACHE='fielddock-v4.18.8-shell';
+const CACHE='fielddock-v4.18.9-shell';
 // config.js is intentionally excluded: backend configuration must always come from the network.
 const SHELL=['./','./index.html','./manifest.json','./icon-192.png','./icon-512.png'];
 
