@@ -2546,6 +2546,7 @@ html[data-work-view="site"] .management-controls{display:none!important}
     refresh();
     try{applyPermissionsUI()}catch(e){}
     try{renderDashboard()}catch(e){}
+    try{if(typeof renderSiteItems==='function')renderSiteItems()}catch(e){}
     refresh();
     if(typeof closeHeaderMenu==='function')closeHeaderMenu();
   });
@@ -2601,6 +2602,19 @@ html[data-work-view="site"] .management-controls{display:none!important}
    document.body.appendChild(el);return el;
  }
  function askDelete(){return new Promise(resolve=>{const d=ensureItemDeleteDialog(),cancel=$id('siteItemDeleteCancel'),ok=$id('siteItemDeleteConfirm');let done=v=>{d.hidden=true;cancel.onclick=null;ok.onclick=null;d.onclick=null;resolve(v)};cancel.onclick=()=>done(false);ok.onclick=()=>done(true);d.onclick=e=>{if(e.target===d)done(false)};d.hidden=false})}
+ function ensureSiteItemPhotoDialog(){
+   let el=$id('siteItemPhotoDialog');if(el)return el;
+   el=document.createElement('div');el.id='siteItemPhotoDialog';el.className='fd-delete-modal';el.hidden=true;
+   el.innerHTML=`<div class='fd-delete-dialog' role='dialog' aria-modal='true' aria-labelledby='siteItemPhotoTitle'><h2 id='siteItemPhotoTitle'>Add photo</h2><p class='small'>Take a new site photo or choose one already on this device.</p><div class='customise'><button type='button' class='btn primary' id='siteItemTakePhoto'>Take photo</button><button type='button' class='btn' id='siteItemChoosePhoto'>Choose existing</button><button type='button' class='btn' id='siteItemPhotoCancel'>Cancel</button></div></div>`;
+   document.body.appendChild(el);return el;
+ }
+ function showSiteItemPhotoChoice(root,id){
+   const d=ensureSiteItemPhotoDialog(),take=$id('siteItemTakePhoto'),choose=$id('siteItemChoosePhoto'),cancel=$id('siteItemPhotoCancel');
+   const close=()=>{d.hidden=true;take.onclick=null;choose.onclick=null;cancel.onclick=null;d.onclick=null};
+   take.onclick=()=>{const i=root.querySelector(`.site-item-photo-camera[data-id='${CSS.escape(id)}']`);close();if(i)i.click()};
+   choose.onclick=()=>{const i=root.querySelector(`.site-item-photo-existing[data-id='${CSS.escape(id)}']`);close();if(i)i.click()};
+   cancel.onclick=close;d.onclick=e=>{if(e.target===d)close()};d.hidden=false;
+ }
  function cardHtml(x,photos,completed){
    const floor=inferSiteItemFloor(x),loc=String(x.location||'').replace(new RegExp('^'+floor+'\\s*','i'),'').trim();
    const photoHtml=photos.length?`<div class='site-item-photo-grid'>${photos.map(ph=>`<img class='site-item-photo' src='${esc(ph.url)}' data-photo-url='${esc(ph.url)}' alt='Site item photo'>`).join('')}</div>`:'';
@@ -2609,7 +2623,7 @@ html[data-work-view="site"] .management-controls{display:none!important}
    const manage=managerMode();
    let actions=completed
      ? (manage?`<div class='site-item-actions'><button class='btn site-item-reopen' data-id='${esc(x.id)}'>Reopen</button><button class='btn site-item-more' data-id='${esc(x.id)}' aria-label='More actions'>⋮</button></div><div class='site-item-manage-menu' data-menu='${esc(x.id)}' hidden><button class='btn site-item-delete' data-id='${esc(x.id)}'>Delete</button></div>`:'')
-     : `<div class='site-item-actions'><button class='btn primary site-item-complete' data-id='${esc(x.id)}'>Complete</button><button type='button' class='btn site-item-photo-btn' data-id='${esc(x.id)}'>Add photo</button><input type='file' accept='image/jpeg,image/png,image/webp,image/heic,image/heif' class='site-item-photo-input' data-id='${esc(x.id)}' style='display:none'>${manage?`<button class='btn site-item-more' data-id='${esc(x.id)}' aria-label='More actions'>⋮</button>`:''}</div>${manage?`<div class='site-item-manage-menu' data-menu='${esc(x.id)}' hidden><button class='btn site-item-delete' data-id='${esc(x.id)}'>Delete</button></div>`:''}`;
+     : `<div class='site-item-actions'><button class='btn primary site-item-complete' data-id='${esc(x.id)}'>Complete</button><button type='button' class='btn site-item-photo-btn' data-id='${esc(x.id)}'>Add photo</button><input type='file' accept='image/*' capture='environment' class='site-item-photo-input site-item-photo-camera' data-id='${esc(x.id)}' style='display:none'><input type='file' accept='image/jpeg,image/png,image/webp,image/heic,image/heif' class='site-item-photo-input site-item-photo-existing' data-id='${esc(x.id)}' style='display:none'>${manage?`<button class='btn site-item-more' data-id='${esc(x.id)}' aria-label='More actions'>⋮</button>`:''}</div>${manage?`<div class='site-item-manage-menu' data-menu='${esc(x.id)}' hidden><button class='btn site-item-delete' data-id='${esc(x.id)}'>Delete</button></div>`:''}`;
    return `<details class='result site-item-card' data-site-item='${esc(x.id)}'><summary><span class='site-item-location'>${esc([floor,loc].filter(Boolean).join(' → ')||'Location not set')}</span><span class='status-chip ${completed?'':'set'}'>${completed?'Complete':'Open'}</span><span class='site-item-title'>${esc(x.title||'Untitled item')}</span><span class='site-item-cue' aria-hidden='true'>›</span></summary><div class='site-item-expanded'><div class='record-badges'><span class='status-chip'>${esc(x.list||'General')}</span><span class='status-chip'>${esc(x.priority||'Normal')}</span>${x.assigned?`<span class='status-chip'>${esc(x.assigned)}</span>`:''}</div>${x.notes?`<div class='record-detail'>${esc(x.notes)}</div>`:''}<div class='small' style='margin-top:8px'>${added}</div>${done}${photoHtml}${actions}</div></details>`;
  }
  async function cards(rows,done){let out=[];for(const x of rows)out.push(cardHtml(x,await pbSiteItemPhotos(x.id),done));return out.join('')}
@@ -2618,7 +2632,7 @@ html[data-work-view="site"] .management-controls{display:none!important}
    root.querySelectorAll('.site-item-complete').forEach(b=>b.onclick=async()=>{const now=new Date().toISOString(),who=currentUserName(),items=siteItemsForProject().map(x=>x.id===b.dataset.id?{...x,status:'complete',updatedAt:now,completedAt:now,completedBy:who}:x);try{await saveSiteItems(items);await renderSiteItems();try{renderDashboard()}catch(e){}}catch(e){alert('Could not update site item: '+e.message)}});
    root.querySelectorAll('.site-item-reopen').forEach(b=>b.onclick=async()=>{const now=new Date().toISOString(),items=siteItemsForProject().map(x=>x.id===b.dataset.id?{...x,status:'open',updatedAt:now,completedAt:'',completedBy:''}:x);try{await saveSiteItems(items);await renderSiteItems();try{renderDashboard()}catch(e){}}catch(e){alert('Could not reopen site item: '+e.message)}});
    root.querySelectorAll('.site-item-more').forEach(b=>b.onclick=()=>{const m=root.querySelector(`[data-menu='${CSS.escape(b.dataset.id)}']`);if(m)m.hidden=!m.hidden});
-   root.querySelectorAll('.site-item-photo-btn').forEach(b=>b.onclick=()=>{const i=root.querySelector(`.site-item-photo-input[data-id='${CSS.escape(b.dataset.id)}']`);if(i)i.click()});
+   root.querySelectorAll('.site-item-photo-btn').forEach(b=>b.onclick=()=>showSiteItemPhotoChoice(root,b.dataset.id));
    root.querySelectorAll('.site-item-photo-input').forEach(i=>i.onchange=async()=>{const file=i.files?.[0];if(!file)return;try{await uploadSiteItemPhoto(i.dataset.id,file);await renderSiteItems()}catch(e){alert('Could not upload photo: '+e.message)}finally{i.value=''}});
    root.querySelectorAll('.site-item-photo').forEach(img=>img.onclick=async()=>{try{await openPbProtectedFile(img.dataset.photoUrl)}catch(e){alert('Could not open photo: '+e.message)}});
    root.querySelectorAll('.site-item-delete').forEach(b=>b.onclick=async()=>{if(!(await askDelete()))return;try{await saveSiteItems(siteItemsForProject().filter(x=>x.id!==b.dataset.id));await renderSiteItems();try{renderDashboard()}catch(e){}}catch(e){alert('Could not delete site item: '+e.message)}});
