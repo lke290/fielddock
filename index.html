@@ -2570,6 +2570,16 @@ html[data-work-view="site"] .management-controls{display:none!important}
 .site-item-manage-menu{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px solid var(--line)}
 .site-item-manage-menu[hidden]{display:none!important}
 .site-item-card .record-header{gap:10px}
+.site-item-card{padding:0!important;overflow:hidden}
+.site-item-card>summary{list-style:none;cursor:pointer;padding:14px 16px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 12px;align-items:center}
+.site-item-card>summary::-webkit-details-marker{display:none}
+.site-item-card>summary .site-item-location{font-weight:850;font-size:1.05rem;min-width:0}
+.site-item-card>summary .site-item-title{grid-column:1/2;color:var(--text);font-weight:750;min-width:0}
+.site-item-card>summary .site-item-cue{grid-column:2/3;grid-row:2;color:var(--muted);font-size:1.35rem;line-height:1;transition:transform .15s ease}
+.site-item-card[open]>summary .site-item-cue{transform:rotate(90deg)}
+.site-item-card .site-item-expanded{padding:0 16px 16px;border-top:1px solid var(--line);margin-top:0}
+.site-item-card .site-item-expanded .record-badges{margin-top:12px}
+.site-item-card+.site-item-card{margin-top:10px}
 .site-item-photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:8px;margin-top:10px}
 .site-item-photo-grid img{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:10px;cursor:pointer}
 @media(max-width:700px){#currentSiteListPanel .grid:has(#siteItemSearch){grid-template-columns:1fr!important}.site-item-more{margin-left:0}}
@@ -2600,7 +2610,7 @@ html[data-work-view="site"] .management-controls{display:none!important}
    let actions=completed
      ? (manage?`<div class='site-item-actions'><button class='btn site-item-reopen' data-id='${esc(x.id)}'>Reopen</button><button class='btn site-item-more' data-id='${esc(x.id)}' aria-label='More actions'>⋮</button></div><div class='site-item-manage-menu' data-menu='${esc(x.id)}' hidden><button class='btn site-item-delete' data-id='${esc(x.id)}'>Delete</button></div>`:'')
      : `<div class='site-item-actions'><button class='btn primary site-item-complete' data-id='${esc(x.id)}'>Complete</button><button type='button' class='btn site-item-photo-btn' data-id='${esc(x.id)}'>Add photo</button><input type='file' accept='image/jpeg,image/png,image/webp,image/heic,image/heif' class='site-item-photo-input' data-id='${esc(x.id)}' style='display:none'>${manage?`<button class='btn site-item-more' data-id='${esc(x.id)}' aria-label='More actions'>⋮</button>`:''}</div>${manage?`<div class='site-item-manage-menu' data-menu='${esc(x.id)}' hidden><button class='btn site-item-delete' data-id='${esc(x.id)}'>Delete</button></div>`:''}`;
-   return `<div class='result site-item-card' data-site-item='${esc(x.id)}'><div class='record-header'><span><b>${esc([floor,loc].filter(Boolean).join(' → ')||'Location not set')}</b></span><span class='status-chip ${completed?'':'set'}'>${completed?'Complete':'Open'}</span></div><div class='record-mainline'>${esc(x.title||'Untitled item')}</div><div class='record-badges'><span class='status-chip'>${esc(x.list||'General')}</span><span class='status-chip'>${esc(x.priority||'Normal')}</span>${x.assigned?`<span class='status-chip'>${esc(x.assigned)}</span>`:''}</div>${x.notes?`<div class='record-detail'>${esc(x.notes)}</div>`:''}<div class='small' style='margin-top:8px'>${added}</div>${done}${photoHtml}${actions}</div>`;
+   return `<details class='result site-item-card' data-site-item='${esc(x.id)}'><summary><span class='site-item-location'>${esc([floor,loc].filter(Boolean).join(' → ')||'Location not set')}</span><span class='status-chip ${completed?'':'set'}'>${completed?'Complete':'Open'}</span><span class='site-item-title'>${esc(x.title||'Untitled item')}</span><span class='site-item-cue' aria-hidden='true'>›</span></summary><div class='site-item-expanded'><div class='record-badges'><span class='status-chip'>${esc(x.list||'General')}</span><span class='status-chip'>${esc(x.priority||'Normal')}</span>${x.assigned?`<span class='status-chip'>${esc(x.assigned)}</span>`:''}</div>${x.notes?`<div class='record-detail'>${esc(x.notes)}</div>`:''}<div class='small' style='margin-top:8px'>${added}</div>${done}${photoHtml}${actions}</div></details>`;
  }
  async function cards(rows,done){let out=[];for(const x of rows)out.push(cardHtml(x,await pbSiteItemPhotos(x.id),done));return out.join('')}
  function wireActions(root){
