@@ -97,3 +97,9 @@ Suggested first test
 ## v4.18.4
 - Closes hamburger, account and appearance overlays whenever navigating to another FieldDock page.
 - Retains the v4.18.3 dashboard flow correction and v4.18.2 regression fixes.
+
+
+## v4.19.14
+- Removed the redundant Projects item from the hamburger menu.
+- The persistent header Projects button remains the single project-navigation entry point.
+- Supervisor/Admin Joiner View / Management View switch is unchanged.
