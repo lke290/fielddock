@@ -2639,16 +2639,32 @@ html[data-work-view="site"] .management-controls{display:none!important}
  }
  function cardHtml(x,photos,completed){
    const floor=inferSiteItemFloor(x),loc=String(x.location||'').replace(new RegExp('^'+floor+'\\s*','i'),'').trim();
-   const photoHtml=photos.length?`<div class='site-item-photo-grid'>${photos.map(ph=>`<img class='site-item-photo' src='${esc(ph.url)}' data-photo-url='${esc(ph.url)}' alt='Site item photo'>`).join('')}</div>`:'';
+   const photoHtml=photos.length?`<div class='site-item-photo-grid'>${photos.map(ph=>`<img class='site-item-photo' data-photo-url='${esc(ph.url)}' alt='Site item photo' loading='lazy'>`).join('')}</div>`:'';
    const added=`Added ${esc(fmtDate(x.createdAt||''))}${x.createdBy?' by '+esc(x.createdBy):''}${x.due?` • Due ${esc(x.due)}`:''}`;
    const done=completed?`<div class='small' style='margin-top:8px'><b>Completed ${esc(fmtDate(x.completedAt||x.updatedAt||''))}${x.completedBy?' by '+esc(x.completedBy):''}</b></div>`:'';
    const manage=managerMode();
    let actions=completed
      ? (manage?`<div class='site-item-actions'><button class='btn site-item-reopen' data-id='${esc(x.id)}'>Reopen</button><button class='btn site-item-more' data-id='${esc(x.id)}' aria-label='More actions'>⋮</button></div><div class='site-item-manage-menu' data-menu='${esc(x.id)}' hidden><button class='btn site-item-delete' data-id='${esc(x.id)}'>Delete</button></div>`:'')
-     : `<div class='site-item-actions'><button class='btn primary site-item-complete' data-id='${esc(x.id)}'>Complete</button><button type='button' class='btn site-item-photo-btn' data-id='${esc(x.id)}'>Add photo</button>${manage?`<button class='btn site-item-more' data-id='${esc(x.id)}' aria-label='More actions'>⋮</button>`:''}</div>${manage?`<div class='site-item-manage-menu' data-menu='${esc(x.id)}' hidden><button class='btn site-item-delete' data-id='${esc(x.id)}'>Delete</button></div>`:''}`;
+     : `<div class='site-item-actions'><button class='btn primary site-item-complete' data-id='${esc(x.id)}'>Complete</button><button type='button' class='btn site-item-photo-btn' data-id='${esc(x.id)}'>Take photo</button>${manage?`<button class='btn site-item-more' data-id='${esc(x.id)}' aria-label='More actions'>⋮</button>`:''}</div>${manage?`<div class='site-item-manage-menu' data-menu='${esc(x.id)}' hidden><button class='btn site-item-delete' data-id='${esc(x.id)}'>Delete</button></div>`:''}`;
    return `<details class='result site-item-card' data-site-item='${esc(x.id)}'><summary><span class='site-item-location'>${esc([floor,loc].filter(Boolean).join(' → ')||'Location not set')}</span><span class='site-item-title'>${esc(x.title||'Untitled item')}</span><span class='site-item-cue' aria-hidden='true'>›</span></summary><div class='site-item-expanded'><div class='record-badges'><span class='status-chip'>${esc(x.list||'General')}</span><span class='status-chip'>${esc(x.priority||'Normal')}</span>${x.assigned?`<span class='status-chip'>${esc(x.assigned)}</span>`:''}</div>${x.notes?`<div class='record-detail'>${esc(x.notes)}</div>`:''}<div class='small' style='margin-top:8px'>${added}</div>${done}${photoHtml}${actions}</div></details>`;
  }
  async function cards(rows,done){let out=[];for(const x of rows)out.push(cardHtml(x,await pbSiteItemPhotos(x.id),done));return out.join('')}
+ async function hydrateSiteItemPhotos(root){
+   if(!root)return;
+   const imgs=[...root.querySelectorAll('.site-item-photo[data-photo-url]')];
+   await Promise.all(imgs.map(async img=>{
+     const raw=img.dataset.photoUrl;
+     if(!raw)return;
+     try{
+       img.src=await pbProtectedFileUrl(raw);
+       img.classList.remove('photo-load-error');
+     }catch(e){
+       console.warn('Could not render site item photo',e);
+       img.classList.add('photo-load-error');
+       img.alt='Photo could not be displayed';
+     }
+   }));
+ }
  function wireActions(root){
    if(!root)return;
    root.querySelectorAll('.site-item-complete').forEach(b=>b.onclick=async()=>{const now=new Date().toISOString(),who=currentUserName(),items=siteItemsForProject().map(x=>x.id===b.dataset.id?{...x,status:'complete',updatedAt:now,completedAt:now,completedBy:who}:x);try{await saveSiteItems(items);await renderSiteItems();try{renderDashboard()}catch(e){}}catch(e){alert('Could not update site item: '+e.message)}});
@@ -2669,7 +2685,9 @@ html[data-work-view="site"] .management-controls{display:none!important}
    if($id('completedSiteItemCount'))$id('completedSiteItemCount').textContent=`(${totalDone})`;
    activeBox.innerHTML=await cards(active,false)||"<p class='small'>No outstanding site items match this view.</p>";
    doneBox.innerHTML=await cards(completed,true)||"<p class='small'>No completed items match the current search and floor filter.</p>";
-   wireActions(activeBox);wireActions(doneBox);restoreOpenSiteItem();
+   wireActions(activeBox);wireActions(doneBox);
+   await Promise.all([hydrateSiteItemPhotos(activeBox),hydrateSiteItemPhotos(doneBox)]);
+   restoreOpenSiteItem();
  };
  ['siteItemSearch','siteItemFloorFilter'].forEach(id=>{const el=$id(id);if(el){const ev=el.tagName==='INPUT'?'input':'change';el.addEventListener(ev,()=>renderSiteItems())}});
  $id('completedSiteListPanel')?.addEventListener('toggle',()=>{if($id('completedSiteListPanel').open)renderSiteItems()});
