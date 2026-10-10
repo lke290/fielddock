@@ -2602,13 +2602,28 @@ html[data-work-view="site"] .management-controls{display:none!important}
    document.body.appendChild(el);return el;
  }
  function askDelete(){return new Promise(resolve=>{const d=ensureItemDeleteDialog(),cancel=$id('siteItemDeleteCancel'),ok=$id('siteItemDeleteConfirm');let done=v=>{d.hidden=true;cancel.onclick=null;ok.onclick=null;d.onclick=null;resolve(v)};cancel.onclick=()=>done(false);ok.onclick=()=>done(true);d.onclick=e=>{if(e.target===d)done(false)};d.hidden=false})}
+ let siteItemPhotoBusy=false;
+ function siteItemPhotoPendingId(input){return input?.dataset?.siteItemId||sessionStorage.getItem('fielddockPendingSiteItemPhoto')||''}
+ function rememberOpenSiteItem(id){try{sessionStorage.setItem('fielddockOpenSiteItem',id||'')}catch(e){}}
+ function restoreOpenSiteItem(){try{const id=sessionStorage.getItem('fielddockOpenSiteItem');if(!id)return;const card=document.querySelector(`details.site-item-card[data-site-item='${CSS.escape(id)}']`);if(card)card.open=true}catch(e){}}
+ async function processSiteItemPhotoInput(input){
+   if(siteItemPhotoBusy)return false;
+   const file=input?.files?.[0],id=siteItemPhotoPendingId(input);if(!file||!id)return false;
+   siteItemPhotoBusy=true;
+   try{await uploadSiteItemPhoto(id,file);await renderSiteItems();restoreOpenSiteItem();return true}
+   catch(e){alert('Could not upload photo: '+e.message);return false}
+   finally{siteItemPhotoBusy=false;try{input.value=''}catch(e){};delete input.dataset.siteItemId;try{sessionStorage.removeItem('fielddockPendingSiteItemPhoto')}catch(e){}}
+ }
  function ensureSiteItemPhotoInputs(){
    let camera=$id('siteItemPhotoCameraInput'),existing=$id('siteItemPhotoExistingInput');
-   if(!camera){camera=document.createElement('input');camera.id='siteItemPhotoCameraInput';camera.type='file';camera.accept='image/*';camera.setAttribute('capture','environment');camera.hidden=true;document.body.appendChild(camera)}
-   if(!existing){existing=document.createElement('input');existing.id='siteItemPhotoExistingInput';existing.type='file';existing.accept='image/*';existing.hidden=true;document.body.appendChild(existing)}
-   const bind=input=>{if(input.dataset.bound)return;input.dataset.bound='1';input.addEventListener('change',async()=>{const file=input.files?.[0],id=input.dataset.siteItemId;if(!file||!id){input.value='';return}try{await uploadSiteItemPhoto(id,file);await renderSiteItems()}catch(e){alert('Could not upload photo: '+e.message)}finally{input.value='';delete input.dataset.siteItemId}})};
+   if(!camera){camera=document.createElement('input');camera.id='siteItemPhotoCameraInput';camera.type='file';camera.accept='image/*';camera.setAttribute('capture','environment');camera.style.position='fixed';camera.style.left='-10000px';camera.style.width='1px';camera.style.height='1px';camera.style.opacity='0';document.body.appendChild(camera)}
+   if(!existing){existing=document.createElement('input');existing.id='siteItemPhotoExistingInput';existing.type='file';existing.accept='image/*';existing.style.position='fixed';existing.style.left='-10000px';existing.style.width='1px';existing.style.height='1px';existing.style.opacity='0';document.body.appendChild(existing)}
+   const bind=input=>{if(input.dataset.bound)return;input.dataset.bound='1';input.addEventListener('change',()=>processSiteItemPhotoInput(input));input.addEventListener('input',()=>processSiteItemPhotoInput(input))};
    bind(camera);bind(existing);return {camera,existing};
  }
+ function retryPendingSiteItemPhoto(){const {camera,existing}=ensureSiteItemPhotoInputs();setTimeout(()=>{processSiteItemPhotoInput(camera);processSiteItemPhotoInput(existing)},250);setTimeout(()=>{processSiteItemPhotoInput(camera);processSiteItemPhotoInput(existing)},900)}
+ window.addEventListener('focus',retryPendingSiteItemPhoto);
+ document.addEventListener('visibilitychange',()=>{if(!document.hidden)retryPendingSiteItemPhoto()});
  function ensureSiteItemPhotoDialog(){
    let el=$id('siteItemPhotoDialog');if(el)return el;
    el=document.createElement('div');el.id='siteItemPhotoDialog';el.className='fd-delete-modal';el.hidden=true;
@@ -2618,8 +2633,8 @@ html[data-work-view="site"] .management-controls{display:none!important}
  function showSiteItemPhotoChoice(root,id){
    const d=ensureSiteItemPhotoDialog(),inputs=ensureSiteItemPhotoInputs(),take=$id('siteItemTakePhoto'),choose=$id('siteItemChoosePhoto'),cancel=$id('siteItemPhotoCancel');
    const close=()=>{d.hidden=true;take.onclick=null;choose.onclick=null;cancel.onclick=null;d.onclick=null};
-   take.onclick=()=>{inputs.camera.dataset.siteItemId=id;close();inputs.camera.click()};
-   choose.onclick=()=>{inputs.existing.dataset.siteItemId=id;close();inputs.existing.click()};
+   take.onclick=()=>{inputs.camera.dataset.siteItemId=id;rememberOpenSiteItem(id);try{sessionStorage.setItem('fielddockPendingSiteItemPhoto',id)}catch(e){};close();inputs.camera.click()};
+   choose.onclick=()=>{inputs.existing.dataset.siteItemId=id;rememberOpenSiteItem(id);try{sessionStorage.setItem('fielddockPendingSiteItemPhoto',id)}catch(e){};close();inputs.existing.click()};
    cancel.onclick=close;d.onclick=e=>{if(e.target===d)close()};d.hidden=false;
  }
  function cardHtml(x,photos,completed){
@@ -2654,7 +2669,7 @@ html[data-work-view="site"] .management-controls{display:none!important}
    if($id('completedSiteItemCount'))$id('completedSiteItemCount').textContent=`(${totalDone})`;
    activeBox.innerHTML=await cards(active,false)||"<p class='small'>No outstanding site items match this view.</p>";
    doneBox.innerHTML=await cards(completed,true)||"<p class='small'>No completed items match the current search and floor filter.</p>";
-   wireActions(activeBox);wireActions(doneBox);
+   wireActions(activeBox);wireActions(doneBox);restoreOpenSiteItem();
  };
  ['siteItemSearch','siteItemFloorFilter'].forEach(id=>{const el=$id(id);if(el){const ev=el.tagName==='INPUT'?'input':'change';el.addEventListener(ev,()=>renderSiteItems())}});
  $id('completedSiteListPanel')?.addEventListener('toggle',()=>{if($id('completedSiteListPanel').open)renderSiteItems()});
