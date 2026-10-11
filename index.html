@@ -1029,12 +1029,16 @@ async function pbSiteItemPhotos(itemId){
   const filter=encodeURIComponent(`project="${p.id}" && site_item_id="${cleanId}"`);
   try{
     const j=await pbRequest(`/api/collections/site_item_photos/records?perPage=100&sort=created&filter=${filter}&_=${Date.now()}`,{cache:'no-store'});
-    return (j.items||[]).map(r=>({
-      id:r.id,
-      url:pbFileUrl(r.collectionId||r.collectionName||'site_item_photos',r.id,r.photo),
-      caption:r.caption||'',
-      created:r.created||''
-    }));
+    let token='';
+    if((j.items||[]).length){
+      try{token=(await pbRequest('/api/files/token',{method:'POST'}))?.token||''}catch(e){console.warn('Site item photo token unavailable',e)}
+    }
+    return (j.items||[]).map(r=>{
+      const raw=pbFileUrl(r.collectionId||r.collectionName||'site_item_photos',r.id,r.photo);
+      let url=raw;
+      if(token&&raw){try{const u=new URL(raw,PB_BASE);u.searchParams.set('token',token);url=u.toString()}catch(e){}}
+      return {id:r.id,url,rawUrl:raw,caption:r.caption||'',created:r.created||''};
+    });
   }catch(e){console.warn('Site item photos unavailable',e);return []}
 }
 async function uploadSiteItemPhoto(itemId,file){let p=activeProject();if(!p?._pocketbase)throw new Error('Site item photos require a PocketBase project.');let fd=new FormData();fd.append('project',p.id);fd.append('site_item_id',itemId);let u=pbAuth()?.record;if(u?.id)fd.append('uploaded_by',u.id);fd.append('photo',file,file.name);fd.append('caption',file.name);let res=await fetch(PB_BASE+'/api/collections/site_item_photos/records',{method:'POST',headers:pbHeaders(false),body:fd});if(!res.ok){let j=await res.json().catch(()=>({}));throw new Error(pbValidationMessage(j,'Photo upload failed.'))}return res.json()}
@@ -2618,12 +2622,12 @@ html[data-work-view="site"] .management-controls{display:none!important}
  let siteItemPhotoBusy=false;
  function siteItemPhotoPendingId(input){return input?.dataset?.siteItemId||sessionStorage.getItem('fielddockPendingSiteItemPhoto')||''}
  function rememberOpenSiteItem(id){try{sessionStorage.setItem('fielddockOpenSiteItem',id||'')}catch(e){}}
- function restoreOpenSiteItem(){try{const id=sessionStorage.getItem('fielddockOpenSiteItem');if(!id)return;const card=document.querySelector(`details.site-item-card[data-site-item='${CSS.escape(id)}']`);if(card)card.open=true}catch(e){}}
+ function restoreOpenSiteItem(options={}){try{const id=sessionStorage.getItem('fielddockOpenSiteItem');if(!id)return;const notes=$id('notes');if(options.navigate&&notes){try{openTab('notes')}catch(e){};const panel=$id('currentSiteListPanel');if(panel)panel.open=true}const card=document.querySelector(`details.site-item-card[data-site-item='${CSS.escape(id)}']`);if(card){card.open=true;if(options.scroll)setTimeout(()=>card.scrollIntoView({behavior:'smooth',block:'center'}),80)}}catch(e){}}
  async function processSiteItemPhotoInput(input){
    if(siteItemPhotoBusy)return false;
    const file=input?.files?.[0],id=siteItemPhotoPendingId(input);if(!file||!id)return false;
    siteItemPhotoBusy=true;
-   try{await uploadSiteItemPhoto(id,file);try{openTab('notes')}catch(e){};await renderSiteItems();restoreOpenSiteItem();return true}
+   try{await uploadSiteItemPhoto(id,file);rememberOpenSiteItem(id);restoreOpenSiteItem({navigate:true});await renderSiteItems();restoreOpenSiteItem({navigate:true,scroll:true});setTimeout(()=>restoreOpenSiteItem({navigate:true}),350);return true}
    catch(e){alert('Could not upload photo: '+e.message);return false}
    finally{siteItemPhotoBusy=false;try{input.value=''}catch(e){};delete input.dataset.siteItemId;try{sessionStorage.removeItem('fielddockPendingSiteItemPhoto')}catch(e){}}
  }
@@ -2681,7 +2685,7 @@ html[data-work-view="site"] .management-controls{display:none!important}
    root.querySelectorAll('.site-item-reopen').forEach(b=>b.onclick=async()=>{const now=new Date().toISOString(),items=siteItemsForProject().map(x=>x.id===b.dataset.id?{...x,status:'open',updatedAt:now,completedAt:'',completedBy:''}:x);try{await saveSiteItems(items);await renderSiteItems();try{renderDashboard()}catch(e){}}catch(e){alert('Could not reopen site item: '+e.message)}});
    root.querySelectorAll('.site-item-more').forEach(b=>b.onclick=()=>{const m=root.querySelector(`[data-menu='${CSS.escape(b.dataset.id)}']`);if(m)m.hidden=!m.hidden});
    root.querySelectorAll('.site-item-photo-btn').forEach(b=>b.onclick=()=>{const {camera}=ensureSiteItemPhotoInputs(),id=b.dataset.id;camera.dataset.siteItemId=id;rememberOpenSiteItem(id);try{sessionStorage.setItem('fielddockPendingSiteItemPhoto',id)}catch(e){};camera.click()});
-   root.querySelectorAll('.site-item-photo').forEach(img=>img.onclick=async()=>{try{await openPbProtectedFile(img.dataset.photoUrl)}catch(e){alert('Could not open photo: '+e.message)}});
+   root.querySelectorAll('.site-item-photo').forEach(img=>img.onclick=()=>{const url=img.dataset.photoUrl||img.src;if(url)window.open(url,'_blank')});
    root.querySelectorAll('.site-item-delete').forEach(b=>b.onclick=async()=>{if(!(await askDelete()))return;try{await saveSiteItems(siteItemsForProject().filter(x=>x.id!==b.dataset.id));await renderSiteItems();try{renderDashboard()}catch(e){}}catch(e){alert('Could not delete site item: '+e.message)}});
  }
  window.renderSiteItems=async function(){
