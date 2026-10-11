@@ -2663,7 +2663,7 @@ html[data-work-view="site"] .management-controls{display:none!important}
  function cardHtml(x,photos,completed){
    const floor=inferSiteItemFloor(x),loc=String(x.location||'').replace(new RegExp('^'+floor+'\\s*','i'),'').trim();
    const photoHtml=photos.length?`<div class='site-item-photo-grid'>${photos.map(ph=>`<img class='site-item-photo' data-photo-url='${esc(ph.url)}' alt='Site item photo' loading='lazy'>`).join('')}</div>`:'';
-   const diagnostic=`<div class='small' style='margin-top:8px'><b>Photo diagnostic:</b> Item ID ${esc(x.id)} • ${esc(photos._diagnostic||(`${photos.length} photo${photos.length===1?'':'s'} found`))}</div>`;
+   const diagnostic=`<div class='small' style='margin-top:8px'><b>Photo diagnostic:</b> Item ID ${esc(x.id)} • ${esc(photos._diagnostic||(`${photos.length} photo${photos.length===1?'':'s'} found`))}<div class='site-item-photo-http' style='margin-top:4px'>${photos.length?'Checking image HTTP response…':'No matching image to check'}</div></div>`;
    const added=`Added ${esc(fmtDate(x.createdAt||''))}${x.createdBy?' by '+esc(x.createdBy):''}${x.due?` • Due ${esc(x.due)}`:''}`;
    const done=completed?`<div class='small' style='margin-top:8px'><b>Completed ${esc(fmtDate(x.completedAt||x.updatedAt||''))}${x.completedBy?' by '+esc(x.completedBy):''}</b></div>`:'';
    const manage=managerMode();
@@ -2675,16 +2675,31 @@ html[data-work-view="site"] .management-controls{display:none!important}
  async function cards(rows,done){let out=[];for(const x of rows)out.push(cardHtml(x,await pbSiteItemPhotos(x.id),done));return out.join('')}
  async function hydrateSiteItemPhotos(root){
    if(!root)return;
-   root.querySelectorAll('.site-item-photo[data-photo-url]').forEach(img=>{
-     const raw=img.dataset.photoUrl;
-     if(!raw)return;
-     img.src=raw;
-     img.addEventListener('error',()=>{
-       img.classList.add('photo-load-error');
-       img.alt='Photo could not be displayed';
-     },{once:true});
-     img.addEventListener('click',()=>window.open(img.src,'_blank'));
-   });
+   const cards=[...root.querySelectorAll('.site-item-card')];
+   await Promise.all(cards.map(async card=>{
+     const imgs=[...card.querySelectorAll('.site-item-photo[data-photo-url]')];
+     const http=card.querySelector('.site-item-photo-http');
+     if(!imgs.length)return;
+     const results=[];
+     await Promise.all(imgs.map(async(img,i)=>{
+       const raw=img.dataset.photoUrl;
+       if(!raw)return;
+       img.src=raw;
+       img.addEventListener('error',()=>{
+         img.classList.add('photo-load-error');
+         img.alt='Photo could not be displayed';
+       },{once:true});
+       img.addEventListener('click',()=>window.open(img.src,'_blank'));
+       try{
+         const res=await fetch(raw,{method:'GET',cache:'no-store'});
+         const type=res.headers.get('content-type')||'no content-type';
+         results[i]=`Image ${i+1}: HTTP ${res.status} ${res.statusText||''} • ${type}`.trim();
+       }catch(e){
+         results[i]=`Image ${i+1}: FETCH ERROR • ${e?.message||String(e)}`;
+       }
+     }));
+     if(http)http.textContent=results.filter(Boolean).join(' | ')||'Image check produced no result';
+   }));
  }
  function wireActions(root){
    if(!root)return;
