@@ -1025,21 +1025,22 @@ function inferSiteItemFloor(x){let f=canonicalSiteFloor(x?.floor);if(f)return f;
 function siteItemFilterOptions(){let all=siteItemsForProject().filter(x=>!x.orderType&&!x.noteType),p=activeProject();let floors=[...new Set([...all.map(x=>inferSiteItemFloor(x)),...(p?.records||[]).map(r=>canonicalSiteFloor(r.floor))].filter(Boolean))].sort(),lists=[...new Set(all.map(x=>x.list||'General').filter(Boolean))].sort();let ff=$('siteItemFloorFilter'),lf=$('siteItemListFilter');if(ff){let v=ff.value;ff.innerHTML="<option value='all'>All floors</option>"+floors.map(x=>`<option value='${esc(x)}'>${esc(x)}</option>`).join('');if([...ff.options].some(o=>o.value===v))ff.value=v}if(lf){let v=lf.value;lf.innerHTML="<option value='all'>All lists</option>"+lists.map(x=>`<option value='${esc(x)}'>${esc(x)}</option>`).join('');if([...lf.options].some(o=>o.value===v))lf.value=v}if($('siteFloorNames'))$('siteFloorNames').innerHTML=floors.map(x=>`<option value='${esc(x)}'></option>`).join('');if($('siteListNames'))$('siteListNames').innerHTML=lists.map(x=>`<option value='${esc(x)}'></option>`).join('')}
 async function pbSiteItemPhotos(itemId){
   let p=activeProject();if(!p?._pocketbase)return [];
-  const cleanId=String(itemId||'').replace(/"/g,'');
-  const params=new URLSearchParams({perPage:'100',sort:'created',filter:`site_item_id="${cleanId}"`,_:String(Date.now())});
+  const cleanId=String(itemId||'').trim();
+  const params=new URLSearchParams({perPage:'200',_:String(Date.now())});
   try{
     const j=await pbRequest('/api/collections/site_item_photos/records?'+params.toString(),{cache:'no-store'});
+    const matched=(j.items||[]).filter(r=>String(r.site_item_id||'').trim()===cleanId);
     let token='';
-    if((j.items||[]).length){
+    if(matched.length){
       try{token=(await pbRequest('/api/files/token',{method:'POST'}))?.token||''}catch(e){console.warn('Site item photo token unavailable',e)}
     }
-    const out=(j.items||[]).map(r=>{
+    const out=matched.map(r=>{
       const raw=pbFileUrl(r.collectionId||r.collectionName||'site_item_photos',r.id,r.photo);
       let url=raw;
       if(token&&raw){try{const u=new URL(raw,PB_BASE);u.searchParams.set('token',token);url=u.toString()}catch(e){}}
       return {id:r.id,url,rawUrl:raw,caption:r.caption||'',created:r.created||''};
     });
-    out._diagnostic=`Request OK • ${out.length} record${out.length===1?'':'s'} returned`;
+    out._diagnostic=`Request OK • ${j.items?.length||0} total • ${out.length} matching record${out.length===1?'':'s'}`;
     return out;
   }catch(e){
     console.warn('Site item photos unavailable',e);
