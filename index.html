@@ -1050,7 +1050,7 @@ async function pbSiteItemPhotos(itemId){
     const out=[];out._diagnostic=`Request failed • ${e?.message||String(e)}`;return out;
   }
 }
-async function uploadSiteItemPhoto(itemId,file){let p=activeProject();if(!p?._pocketbase)throw new Error('Site item photos require a PocketBase project.');let fd=new FormData();fd.append('project',p.id);fd.append('site_item_id',itemId);let u=pbAuth()?.record;if(u?.id)fd.append('uploaded_by',u.id);fd.append('photo',file,file.name);fd.append('caption',file.name);let res=await fetch(PB_BASE+'/api/collections/site_item_photos/records',{method:'POST',headers:pbHeaders(false),body:fd});if(!res.ok){let j=await res.json().catch(()=>({}));throw new Error(pbValidationMessage(j,'Photo upload failed.'))}return res.json()}
+async function uploadSiteItemPhoto(itemId,file){let p=activeProject();if(!p?._pocketbase)throw new Error('Site item photos require a PocketBase project.');let fd=new FormData();fd.append('project',p.id);fd.append('site_item_id',itemId);let u=pbAuth()?.record;if(u?.id)fd.append('uploaded_by',u.id);fd.append('photo',file,file.name);fd.append('caption',file.name);let res=await pbFetch(PB_BASE+'/api/collections/site_item_photos/records',{method:'POST',headers:pbHeaders(false),body:fd});if(!res.ok){let j=await res.json().catch(()=>({}));throw new Error(pbValidationMessage(j,'Photo upload failed.'))}return res.json()}
 async function renderSiteItems(){let box=$('siteItemListView');if(!box)return;let p=activeProject();if(!p){box.innerHTML="<p class='small'>Select a project first.</p>";if($('siteItemSummary'))$('siteItemSummary').textContent='';return}siteItemFilterOptions();let all=siteItemsForProject().filter(x=>!x.orderType&&!x.noteType),q=normaliseSearch($('siteItemSearch')?.value||''),f=$('siteItemFilter')?.value||'all',floor=$('siteItemFloorFilter')?.value||'all',list=$('siteItemListFilter')?.value||'all';let rows=all.filter(x=>(f==='all'||x.status===f)&&(floor==='all'||inferSiteItemFloor(x)===floor)&&(list==='all'||(x.list||'General')===list)&&(!q||normaliseSearch([x.list,x.floor,x.location,x.title,x.notes,x.assigned].join(' ')).includes(q)));let open=all.filter(x=>x.status!=='complete').length,done=all.filter(x=>x.status==='complete').length;if($('siteItemSummary'))$('siteItemSummary').innerHTML=`<b>${open}</b> outstanding • <b>${done}</b> complete • <b>${all.length}</b> total${floor!=='all'?` • Floor: <b>${esc(floor)}</b>`:''}`;let cards=[];for(let x of rows){let photos=await pbSiteItemPhotos(x.id);let photoHtml=photos.length?`<div class='site-item-photo-grid'>${photos.map(ph=>`<img class='site-item-photo' src='${esc(ph.url)}' data-photo-url='${esc(ph.url)}' alt='Site item photo'>`).join('')}</div>`:'';let completed=x.completedAt?` • Completed ${esc(fmtDate(x.completedAt))}${x.completedBy?' by '+esc(x.completedBy):''}`:'';cards.push(`<div class='result site-item-card' data-site-item='${esc(x.id)}'><div class='record-header'><span><b>${esc([inferSiteItemFloor(x),String(x.location||'').replace(new RegExp('^'+inferSiteItemFloor(x)+'\\s*','i'),'').trim()].filter(Boolean).join(' → ')||'Location not set')}</b></span><span class='status-chip ${x.status==='complete'?'':'set'}'>${esc(siteStatusLabel(x.status))}</span></div><div class='record-mainline'>${esc(x.title||'Untitled item')}</div><div class='record-badges'><span class='status-chip'>${esc(x.list||'General')}</span><span class='status-chip'>${esc(x.priority||'Normal')}</span>${x.assigned?`<span class='status-chip'>${esc(x.assigned)}</span>`:''}</div>${x.notes?`<div class='record-detail'>${esc(x.notes)}</div>`:''}<div class='small' style='margin-top:8px'>Added ${esc(fmtDate(x.createdAt||''))}${x.createdBy?' by '+esc(x.createdBy):''}${x.due?` • Due ${esc(x.due)}`:''}${completed}</div>${photoHtml}<div class='customise' style='margin-top:10px'><button class='btn site-item-state' data-state='open' data-id='${esc(x.id)}'>Open</button><button class='btn site-item-state' data-state='progress' data-id='${esc(x.id)}'>In progress</button><button class='btn primary site-item-state' data-state='complete' data-id='${esc(x.id)}'>Complete</button><button type='button' class='btn site-item-photo-btn' data-id='${esc(x.id)}'>Take photo</button><input type='file' accept='image/jpeg,image/png,image/webp,image/heic,image/heif' class='site-item-photo-input' data-id='${esc(x.id)}' style='display:none'><button class='btn site-item-delete' data-id='${esc(x.id)}'>Delete</button></div></div>`)}box.innerHTML=cards.length?cards.join(''):"<p class='small'>No site items match this view.</p>";box.querySelectorAll('.site-item-state').forEach(b=>b.onclick=async()=>{let now=new Date().toISOString(),who=currentUserName();let items=siteItemsForProject().map(x=>x.id===b.dataset.id?{...x,status:b.dataset.state,updatedAt:now,completedAt:b.dataset.state==='complete'?now:'',completedBy:b.dataset.state==='complete'?who:''}:x);try{await saveSiteItems(items);await renderSiteItems()}catch(e){alert('Could not update site item: '+e.message)}});box.querySelectorAll('.site-item-photo-btn').forEach(b=>b.onclick=()=>{let i=box.querySelector(`.site-item-photo-input[data-id='${CSS.escape(b.dataset.id)}']`);if(i)i.click()});box.querySelectorAll('.site-item-photo-input').forEach(i=>i.onchange=async()=>{let file=i.files?.[0];if(!file)return;try{await uploadSiteItemPhoto(i.dataset.id,file);await renderSiteItems()}catch(e){alert('Could not upload photo: '+e.message)}finally{i.value=''}});box.querySelectorAll('.site-item-photo').forEach(img=>img.onclick=async()=>{try{await openPbProtectedFile(img.dataset.photoUrl)}catch(e){alert('Could not open photo: '+e.message)}});box.querySelectorAll('.site-item-delete').forEach(b=>b.onclick=async()=>{if(!confirm('Delete this site item?'))return;try{await saveSiteItems(siteItemsForProject().filter(x=>x.id!==b.dataset.id));await renderSiteItems()}catch(e){alert('Could not delete site item: '+e.message)}})}
 let activeSiteNoteId='';let siteListImportNoteSource='';let siteListImportSourceNote=null;
 let personalNotesCache=[];let projectNotesCache=[];
@@ -1198,7 +1198,7 @@ async function uploadPbDoorPhoto(projectId,recId,kind,file){
   fd.append('original_name',file.name||'site-photo');
   fd.append('mime_type',file.type||'');
 
-  const res=await fetch(PB_BASE+'/api/collections/door_photos/records',{method:'POST',headers:pbHeaders(false),body:fd});
+  const res=await pbFetch(PB_BASE+'/api/collections/door_photos/records',{method:'POST',headers:pbHeaders(false),body:fd});
   let data=null;try{data=await res.json()}catch(e){}
   if(!res.ok){
     const details=data?.data?Object.entries(data.data).map(([k,v])=>`${k}: ${v?.message||JSON.stringify(v)}`).join(' | '):'';
@@ -1207,7 +1207,7 @@ async function uploadPbDoorPhoto(projectId,recId,kind,file){
   return mapPbPhoto(data);
 }
 async function deletePbDoorPhoto(photoId){
-  const res=await fetch(PB_BASE+'/api/collections/door_photos/records/'+encodeURIComponent(photoId),{method:'DELETE',headers:pbHeaders(false)});
+  const res=await pbFetch(PB_BASE+'/api/collections/door_photos/records/'+encodeURIComponent(photoId),{method:'DELETE',headers:pbHeaders(false)});
   if(!res.ok){let data=null;try{data=await res.json()}catch(e){};throw new Error(data?.message||`Photo delete failed (${res.status})`)}
 }
 
@@ -1522,7 +1522,7 @@ async function ensureImportedDocument(projectId,type,title,revision,file,note){
     if(existing)return existing;
     let fd=new FormData();fd.append('project',projectId);fd.append('title',title);fd.append('type',type);fd.append('revision',revision||'');fd.append('note',note||'Imported source document');
     if(file){fd.append('file',file,file.name);fd.append('original_name',file.name);fd.append('mime_type',file.type||'')}
-    let res=await fetch(PB_BASE+'/api/collections/documents/records',{method:'POST',headers:pbHeaders(false),body:fd});
+    let res=await pbFetch(PB_BASE+'/api/collections/documents/records',{method:'POST',headers:pbHeaders(false),body:fd});
     if(!res.ok){let j=await res.json().catch(()=>({}));throw new Error(pbValidationMessage(j,'Could not register import source document.'))}
     return await res.json();
   }catch(e){console.warn('Source document registration skipped',e);return null}
@@ -1539,7 +1539,7 @@ $('scheduleRemoveSource')?.addEventListener('click',async()=>{const {id:projectI
 $('scheduleClear').addEventListener('click',()=>{scheduleImportDraft=[];scheduleImportBase=[];scheduleImportRejected=[];scheduleImportRaw=[];scheduleGeneralNotes=[];scheduleRpCompleteSet=false;scheduleImportWarnings=[];renderSchedulePreview();$('importStatus').textContent='Preview cleared. No records were changed.'});
 $('exportProject').addEventListener('click',()=>{let p=activeProject();if(!p)return;let blob=new Blob([JSON.stringify(p,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=(p.name||'project').replace(/[^a-z0-9]+/gi,'-').toLowerCase()+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500)});
 async function pbDocumentsFor(projectId){const data=await pbRequest('/api/collections/documents/records?perPage=200');const items=(data.items||[]).filter(r=>(Array.isArray(r.project)?r.project:[r.project]).filter(Boolean).includes(projectId));return items.map(r=>{const fn=r.file||r.document||'';const cref=r.collectionId||r.collectionName||'documents';return {id:r.id,title:r.title||fn||'Untitled document',type:r.type||r.document_type||'Other',revision:r.revision||'',date:r.issue_date||r.date||'',note:r.note||'',filename:r.original_name||fn,url:fn?pbFileUrl(cref,r.id,fn):'',_pocketbase:true}})}
-$('docAdd').addEventListener('click',async()=>{let d=projectsData(),p=d.items[d.active];if(!p)return;let item={title:$('docTitle').value.trim()||'Untitled document',type:$('docType').value,revision:$('docRev').value.trim(),date:$('docDate').value,note:$('docNote').value.trim()},f=$('docFile')?.files?.[0];try{if(p._pocketbase){let fd=new FormData();fd.append('project',d.active);fd.append('title',item.title);fd.append('type',item.type);fd.append('revision',item.revision);fd.append('issue_date',item.date);fd.append('note',item.note);if(f){fd.append('file',f,f.name);fd.append('original_name',f.name);fd.append('mime_type',f.type||'')}let res=await fetch(PB_BASE+'/api/collections/documents/records',{method:'POST',headers:pbHeaders(false),body:fd});if(!res.ok){let j=await res.json().catch(()=>({}));throw new Error(pbValidationMessage(j,'Failed to create document.'))}}else{p.docs=p.docs||[];p.docs.push({id:newId('doc'),...item});saveProjectsData(d)}['docTitle','docRev','docDate','docNote'].forEach(id=>$(id).value='');if($('docFile'))$('docFile').value='';await renderDocs();renderDashboard()}catch(e){alert('Could not save document: '+e.message)}});
+$('docAdd').addEventListener('click',async()=>{let d=projectsData(),p=d.items[d.active];if(!p)return;let item={title:$('docTitle').value.trim()||'Untitled document',type:$('docType').value,revision:$('docRev').value.trim(),date:$('docDate').value,note:$('docNote').value.trim()},f=$('docFile')?.files?.[0];try{if(p._pocketbase){let fd=new FormData();fd.append('project',d.active);fd.append('title',item.title);fd.append('type',item.type);fd.append('revision',item.revision);fd.append('issue_date',item.date);fd.append('note',item.note);if(f){fd.append('file',f,f.name);fd.append('original_name',f.name);fd.append('mime_type',f.type||'')}let res=await pbFetch(PB_BASE+'/api/collections/documents/records',{method:'POST',headers:pbHeaders(false),body:fd});if(!res.ok){let j=await res.json().catch(()=>({}));throw new Error(pbValidationMessage(j,'Failed to create document.'))}}else{p.docs=p.docs||[];p.docs.push({id:newId('doc'),...item});saveProjectsData(d)}['docTitle','docRev','docDate','docNote'].forEach(id=>$(id).value='');if($('docFile'))$('docFile').value='';await renderDocs();renderDashboard()}catch(e){alert('Could not save document: '+e.message)}});
 async function renderDocs(){let p=activeProject(),el=$('docList');if(!p){el.innerHTML="<p class='small'>No active project.</p>";return}try{let docs=p._pocketbase?await pbDocumentsFor(projectsData().active):(p.docs||[]);el.innerHTML=docs.length?docs.map(d=>`<div class='result' style='margin-bottom:8px'><b>${esc(d.title)}</b> • ${esc(d.type)} • ${esc(d.revision||'No revision')} ${d.date?'• '+esc(d.date):''}<br><span class='small'>${esc(d.note||'')}</span>${d.filename?`<br><span class='small'>${esc(d.filename)}</span>`:''}${d.url?` <button type='button' class='btn doc-open' data-doc='${esc(d.id)}'>Open file</button>`:''}<button type='button' class='btn doc-del' data-doc='${esc(d.id)}' style='margin-left:8px'>Delete</button></div>`).join(''):"<p class='small'>No documents registered yet.</p>";el.querySelectorAll('.doc-open').forEach(b=>b.addEventListener('click',async()=>{let x=docs.find(v=>v.id===b.dataset.doc);if(x?.url){if(p._pocketbase)await openPbProtectedFile(x.url);else window.open(x.url,'_blank')}}));el.querySelectorAll('.doc-del').forEach(b=>b.addEventListener('click',async()=>{if(!confirm('Delete this document?'))return;try{if(p._pocketbase)await pbRequest('/api/collections/documents/records/'+b.dataset.doc,{method:'DELETE'});else{let d=projectsData(),pp=d.items[d.active];pp.docs=pp.docs.filter(x=>x.id!==b.dataset.doc);saveProjectsData(d)}await renderDocs();renderDashboard()}catch(e){alert('Could not delete document: '+e.message)}}))}catch(e){el.innerHTML=`<p class='small'>Could not load documents: ${esc(e.message)}</p>`}}
 
 
@@ -1630,7 +1630,7 @@ if(sourceNote&&p._pocketbase){
 }
 if(activeProject()?.id!==p.id)throw new Error('The project changed during import. Return to the original project and retry Confirm.');
 await saveSiteItems([...items,...siteItemsForProject().filter(x=>!items.some(item=>item.id===x.id))]);status.textContent=`Imported ${items.length} items into “${cat}”.${sourceNote?' Note moved to Processed notes and shared with the project.':''}${sourceNote&&p._pocketbase?' Backend snags verified: '+items.length+'.':''}`;siteListImportDraft=[];siteListImportNoteSource='';siteListImportSourceNote=null;$('siteListImportPreviewArea').innerHTML='';$('siteListImportConfirm').disabled=true;await renderSiteItems();await renderSiteNotes()}catch(e){status.textContent='Could not import list: '+e.message+' Saved records are kept; retry Confirm to finish.'}finally{siteListImportConfirmBusy=false;$('siteListImportConfirm').disabled=!siteListImportDraft.length}});
-$('sharedGuideAdd')?.addEventListener('click',async()=>{let file=$('sharedGuideFile')?.files?.[0],title=$('sharedGuideTitle')?.value.trim(),status=$('sharedGuideStatus');if(!file){status.textContent='Choose a PDF first.';return}if(!title)title=file.name.replace(/\.pdf$/i,'');let fd=new FormData();fd.append('title',title);fd.append('type',$('sharedGuideType').value);fd.append('revision',$('sharedGuideRevision').value.trim());fd.append('keywords',$('sharedGuideKeywords').value.trim());fd.append('original_name',file.name);fd.append('mime_type',file.type||'application/pdf');fd.append('file',file,file.name);try{status.textContent='Uploading…';let res=await fetch(PB_BASE+'/api/collections/shared_guidance/records',{method:'POST',headers:pbHeaders(false),body:fd});if(!res.ok){let j=await res.json().catch(()=>({}));throw new Error(pbValidationMessage(j,'Shared guide upload failed.'))}['sharedGuideTitle','sharedGuideRevision','sharedGuideKeywords'].forEach(id=>$(id).value='');$('sharedGuideFile').value='';status.textContent='Shared guide uploaded. It is now available from every project.';await renderSharedGuidance();renderCompletion();searchProject()}catch(e){status.textContent='Could not upload shared guide: '+e.message}});
+$('sharedGuideAdd')?.addEventListener('click',async()=>{let file=$('sharedGuideFile')?.files?.[0],title=$('sharedGuideTitle')?.value.trim(),status=$('sharedGuideStatus');if(!file){status.textContent='Choose a PDF first.';return}if(!title)title=file.name.replace(/\.pdf$/i,'');let fd=new FormData();fd.append('title',title);fd.append('type',$('sharedGuideType').value);fd.append('revision',$('sharedGuideRevision').value.trim());fd.append('keywords',$('sharedGuideKeywords').value.trim());fd.append('original_name',file.name);fd.append('mime_type',file.type||'application/pdf');fd.append('file',file,file.name);try{status.textContent='Uploading…';let res=await pbFetch(PB_BASE+'/api/collections/shared_guidance/records',{method:'POST',headers:pbHeaders(false),body:fd});if(!res.ok){let j=await res.json().catch(()=>({}));throw new Error(pbValidationMessage(j,'Shared guide upload failed.'))}['sharedGuideTitle','sharedGuideRevision','sharedGuideKeywords'].forEach(id=>$(id).value='');$('sharedGuideFile').value='';status.textContent='Shared guide uploaded. It is now available from every project.';await renderSharedGuidance();renderCompletion();searchProject()}catch(e){status.textContent='Could not upload shared guide: '+e.message}});
 const PROJECT_REQUIREMENT_TYPES=new Set(['Client instruction','Installation guide','Manufacturer instruction','Project specification','Project guidance']);
 $('reqFile')?.addEventListener('change',()=>{const f=$('reqFile').files?.[0];if(f&&!$('reqTitle').value.trim())$('reqTitle').value=f.name.replace(/\.pdf$/i,'').replace(/[_-]+/g,' ')});
 $('reqAdd')?.addEventListener('click', async () => {
@@ -1650,7 +1650,7 @@ $('reqAdd')?.addEventListener('click', async () => {
       fd.append('project',d.active); fd.append('title',title); fd.append('type',type);
       fd.append('revision',revision); fd.append('issue_date',''); fd.append('note',keywords);
       fd.append('file',f,f.name); fd.append('original_name',f.name); fd.append('mime_type',f.type||'application/pdf');
-      const res=await fetch(PB_BASE+'/api/collections/documents/records',{method:'POST',headers:pbHeaders(false),body:fd});
+      const res=await pbFetch(PB_BASE+'/api/collections/documents/records',{method:'POST',headers:pbHeaders(false),body:fd});
       if(!res.ok){const j=await res.json().catch(()=>({}));throw new Error(pbValidationMessage(j,'Failed to save project instruction.'));}
     } else {
       p.docs=p.docs||[];
@@ -1990,7 +1990,7 @@ async function saveDrawing(item){
   let p=projectsData().items[item.projectId];
   if(p?._pocketbase){
     let fd=new FormData();fd.append('project',item.projectId);fd.append('title',item.title||item.filename||'Drawing');fd.append('category',item.category||'Other Drawings');fd.append('level',item.level||'');fd.append('revision',item.revision||'');fd.append('original_name',item.filename||item.file?.name||'');fd.append('mime_type',item.type||item.file?.type||'');fd.append('file',item.file,item.file?.name||'drawing');
-    let res=await fetch(PB_BASE+'/api/collections/drawings/records',{method:'POST',headers:pbHeaders(false),body:fd});if(!res.ok){let j=await res.json().catch(()=>({}));throw new Error(pbValidationMessage(j,'Failed to upload drawing.'))}return await res.json()
+    let res=await pbFetch(PB_BASE+'/api/collections/drawings/records',{method:'POST',headers:pbHeaders(false),body:fd});if(!res.ok){let j=await res.json().catch(()=>({}));throw new Error(pbValidationMessage(j,'Failed to upload drawing.'))}return await res.json()
   }
   let db=await drawingDB();return new Promise((resolve,reject)=>{let tx=db.transaction(DRAWING_STORE,'readwrite');tx.objectStore(DRAWING_STORE).put(item);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error)})
 }
@@ -2075,13 +2075,59 @@ window.addEventListener('online',refreshNetworkState);window.addEventListener('o
 const PB_AUTH_KEY='jr_pb_auth';
 function pbAuth(){try{return JSON.parse(localStorage.getItem(PB_AUTH_KEY)||'null')}catch(e){return null}}
 function pbHeaders(json=true){const a=pbAuth(),h={};if(json)h['Content-Type']='application/json';if(a?.token)h['Authorization']=a.token;return h}
+// Validate with PocketBase before protected requests: list rules can return 200/empty for invalid auth.
+let pbVerifiedToken='',pbRefreshPromise=null,pbRefreshToken='';
+function clearPbAuth(){
+  localStorage.removeItem(PB_AUTH_KEY);pbVerifiedToken='';applyAuth();
+}
+function pbSessionError(){return new Error('Your FieldDock session has expired or is invalid. Please sign in again.')}
+async function ensurePbAuth(){
+  const a=pbAuth(),token=a?.token;
+  if(!token||!a?.record?.id){clearPbAuth();throw pbSessionError()}
+  if(pbRefreshPromise&&pbRefreshToken===token)return pbRefreshPromise;
+  const pending=(async()=>{
+    let res;
+    try{res=await fetch(PB_BASE+'/api/collections/users/auth-refresh',{
+      method:'POST',cache:'no-store',headers:{Authorization:token}
+    })}catch(e){pbVerifiedToken='';applyAuth();throw new Error('FieldDock cannot verify your session. Check your connection and try again.')}
+    const data=await res.json().catch(()=>null);
+    // A logout or another tab/account must never be overwritten by an older refresh.
+    if(pbAuth()?.token!==token)throw new Error('Your FieldDock account changed. Please try again.');
+    if(!res.ok){
+      pbVerifiedToken=''; 
+      if(res.status===401||res.status===403){clearPbAuth();throw pbSessionError()}
+      applyAuth();throw new Error('FieldDock could not verify your session (HTTP '+res.status+'). Please try again.');
+    }
+    if(!data?.token||data?.record?.id!==a.record.id){clearPbAuth();throw pbSessionError()}
+    localStorage.setItem(PB_AUTH_KEY,JSON.stringify(data));pbVerifiedToken=data.token;applyAuth();
+    return data;
+  })();
+  pbRefreshToken=token;pbRefreshPromise=pending;
+  try{return await pending}finally{if(pbRefreshPromise===pending){pbRefreshPromise=null;pbRefreshToken=''}}
+}
+async function pbFetch(url,options={},publicRequest=false){
+  if(!PB_BASE){setConnectionState('unconfigured');throw new Error('FieldDock backend is not configured yet.')}
+  if(!navigator.onLine){setConnectionState('offline');throw new Error('You are offline. This change has not been sent to FieldDock.')}
+  const a=publicRequest?null:await ensurePbAuth();
+  const headers=new Headers(options.headers||{});
+  if(a){
+    if(pbAuth()?.token!==a.token)throw new Error('Your FieldDock account changed. Please try again.');
+    headers.set('Authorization',a.token);
+  }else headers.delete('Authorization');
+  const res=await fetch(url,{...options,headers,cache:'no-store'});
+  if(a&&res.status===401&&pbAuth()?.token===a.token){clearPbAuth();throw pbSessionError()}
+  return res;
+}
+window.addEventListener('storage',e=>{if(e.key===PB_AUTH_KEY||e.key===null){pbVerifiedToken='';applyAuth()}});
+
 async function pbRequest(path,options={}){
   if(!PB_BASE){setConnectionState('unconfigured');throw new Error('FieldDock backend is not configured yet.');}
   if(!navigator.onLine){setConnectionState('offline');throw new Error('You are offline. This change has not been sent to FieldDock.');}
   const isForm=options.body instanceof FormData;
   setConnectionState('connecting');
   let res;
-  try{res=await fetch(PB_BASE+path,{...options,headers:{...pbHeaders(!isForm),...(options.headers||{})}})}catch(e){setConnectionState('offline');throw new Error('FieldDock cannot reach the server. Check your connection and try again.');}
+  const publicRequest=['/api/collections/users/auth-with-password','/api/fielddock/invites/validate','/api/fielddock/invites/redeem'].includes(path);
+  try{res=await pbFetch(PB_BASE+path,{...options,headers:{...pbHeaders(!isForm),...(options.headers||{})}},publicRequest)}catch(e){setConnectionState(navigator.onLine?'connecting':'offline');throw e;}
   let data=null;try{data=await res.json()}catch(e){}
   if(!res.ok){
     setConnectionState('online');
@@ -2103,7 +2149,7 @@ function canManageProject(projectId=projectsData().active){let m=membershipFor(p
 function canUseProject(projectId=projectsData().active){return canManageProject(projectId)||!!membershipFor(projectId)}
 async function syncMemberships(){
   if(!pbAuth()?.token){pbMemberships=[];return}
-  try{let data=await pbRequest('/api/collections/project_members/records?perPage=500');pbMemberships=data.items||[]}catch(e){pbMemberships=[];console.warn('Membership sync unavailable',e)}
+  let data=await pbRequest('/api/collections/project_members/records?perPage=500');pbMemberships=data.items||[];
 }
 function applyPermissionsUI(){
   const manage=canManageProject();document.querySelectorAll('.calendar-add-event').forEach(el=>el.style.display=manage?'':'none');document.querySelectorAll('.management-controls').forEach(el=>el.style.display=manage?'':'none');
@@ -2162,14 +2208,15 @@ async function createPbSchedule(r,projectId){
   }));
 }
 async function deletePbSchedule(recordId){
-  const res=await fetch(PB_BASE+'/api/collections/schedule_records/records/'+encodeURIComponent(recordId),
+  const res=await pbFetch(PB_BASE+'/api/collections/schedule_records/records/'+encodeURIComponent(recordId),
     {method:'DELETE',headers:pbHeaders(false)});
   if(!res.ok){let data=null;try{data=await res.json()}catch(e){};throw new Error(data?.message||`Delete failed (${res.status})`)}
 }
 
 async function syncPocketBaseProjects(){
-  const a=pbAuth();if(!a?.token)return;
+  if(!pbAuth()?.token)return;
   await syncMemberships();
+  const a=pbAuth();
   const data=await pbRequest('/api/collections/projects/records?perPage=200&sort=name');
   // Supervisors may manage all projects returned by PocketBase. Joiners only get
   // projects for which they have an explicit project_members record.
@@ -2206,7 +2253,7 @@ async function syncPocketBaseProjects(){
   applyPermissionsUI();
 }
 function applyAuth(){
-  const a=pbAuth(),u=a?.record,valid=!!(a?.token&&u);
+  const a=pbAuth(),u=a?.record,valid=!!(a?.token&&u&&a.token===pbVerifiedToken);
   document.getElementById('loginScreen')?.classList.toggle('hidden',valid);
   const sum=document.getElementById('accountSummary');
   if(sum)sum.innerHTML=valid?`<b>${esc(u.name||u.email)}</b><br>${esc(u.role||'user')}<br><span class="small">PocketBase account</span>`:'Not signed in';
@@ -2221,11 +2268,11 @@ document.getElementById('signInBtn')?.addEventListener('click',async()=>{
   btn.disabled=true;btn.textContent='Signing in…';
   try{
     const data=await pbRequest('/api/collections/users/auth-with-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({identity:email,password})});
-    localStorage.setItem(PB_AUTH_KEY,JSON.stringify(data));personalNotesCache=[];applyAuth();await syncPocketBaseProjects();renderDashboard();if($('notes')?.classList.contains('active'))await renderSiteNotes();
-  }catch(err){localStorage.removeItem(PB_AUTH_KEY);alert('Could not sign in: '+err.message)}
+    localStorage.setItem(PB_AUTH_KEY,JSON.stringify(data));pbVerifiedToken=data.token;personalNotesCache=[];applyAuth();await syncPocketBaseProjects();renderDashboard();if($('notes')?.classList.contains('active'))await renderSiteNotes();
+  }catch(err){clearPbAuth();alert('Could not sign in: '+err.message)}
   finally{btn.disabled=false;btn.textContent='Sign in'}
 });
-document.getElementById('signOutBtn')?.addEventListener('click',()=>{localStorage.removeItem(PB_AUTH_KEY);personalNotesCache=[];activeSiteNoteId='';if($('siteNoteList'))$('siteNoteList').innerHTML='';document.getElementById('accountPanel')?.classList.remove('open');applyAuth()});
+document.getElementById('signOutBtn')?.addEventListener('click',()=>{clearPbAuth();personalNotesCache=[];activeSiteNoteId='';if($('siteNoteList'))$('siteNoteList').innerHTML='';document.getElementById('accountPanel')?.classList.remove('open');applyAuth()});
 document.getElementById('accountBtn')?.addEventListener('click',()=>{closeHeaderMenu();document.getElementById('accountPanel')?.classList.toggle('open')});
 applyAuth();
 const inviteMode=new URLSearchParams(location.search).has('invite');
