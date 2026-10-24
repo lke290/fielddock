@@ -1,0 +1,16 @@
+
+/* v4.19.17 — responsive site-list review. Parsing/import behaviour is unchanged. */
+.site-list-review-row{display:grid;grid-template-columns:auto minmax(260px,2fr) minmax(150px,.8fr) minmax(170px,1fr);gap:8px;align-items:end}
+.site-list-review-use{display:flex;align-items:center;gap:7px;margin:0 0 11px}.site-list-review-use span{display:none}
+.site-list-review-field{display:grid;gap:5px;margin:0;min-width:0}.site-list-review-label{display:none;font-size:.78rem;font-weight:800;color:var(--muted)}
+.site-list-review-match{display:block;margin-top:0}
+@media(max-width:700px){
+ #siteListImportPreviewArea .result[style*="display:flex"]{display:grid!important;grid-template-columns:1fr!important;align-items:stretch!important}
+ #siteListImportPreviewArea .result[style*="display:flex"] label{min-width:0!important;width:100%}
+ #siteListImportPreviewArea .result[style*="display:flex"] .btn{width:100%;min-height:44px}
+ .site-list-review-row{display:grid!important;grid-template-columns:1fr!important;gap:11px!important;padding:13px!important;align-items:stretch!important;overflow:hidden}
+ .site-list-review-use{margin:0;display:flex;align-items:center;gap:9px;font-weight:800}.site-list-review-use span{display:inline}
+ .site-list-review-use input{width:20px;height:20px;flex:0 0 auto}
+ .site-list-review-label{display:block}.site-list-review-field input{width:100%!important;min-width:0;box-sizing:border-box}
+ .site-list-review-item{padding-bottom:3px;border-bottom:1px solid var(--line)}
+}

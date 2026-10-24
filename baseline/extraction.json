@@ -1,0 +1,130 @@
+{
+  "revision": "b45c5f9d06db73fa6ce22c75186f593dc4a0eb3a",
+  "assets": [
+    {
+      "file": "css/01-base.css",
+      "kind": "style",
+      "attributes": ""
+    },
+    {
+      "file": "css/02-mobile-ui-fix.css",
+      "kind": "style",
+      "attributes": " id=\"v4936-mobile-ui-fix\""
+    },
+    {
+      "file": "css/03-polish.css",
+      "kind": "style",
+      "attributes": " id='v4963-polish'"
+    },
+    {
+      "file": "css/04-corrections.css",
+      "kind": "style",
+      "attributes": " id=\"v4186-corrections\""
+    },
+    {
+      "file": "css/05-guidance-regulations.css",
+      "kind": "style",
+      "attributes": " id=\"v4197-guidance-regulations\""
+    },
+    {
+      "file": "css/06-compact-regulation-cards.css",
+      "kind": "style",
+      "attributes": " id=\"v4198-compact-regulation-cards\""
+    },
+    {
+      "file": "css/07-regulation-details.css",
+      "kind": "style",
+      "attributes": " id=\"v4198-regulation-details\""
+    },
+    {
+      "file": "css/08-regulation-polish.css",
+      "kind": "style",
+      "attributes": " id=\"v41910-regulation-polish\""
+    },
+    {
+      "file": "css/09-site-list-mobile-css.css",
+      "kind": "style",
+      "attributes": " id=\"v41915-site-list-mobile-css\""
+    },
+    {
+      "file": "css/10-snag-page.css",
+      "kind": "style",
+      "attributes": " id='v41917-snag-page'"
+    },
+    {
+      "file": "js/01-app-core.js",
+      "kind": "script",
+      "attributes": ""
+    },
+    {
+      "file": "css/11-mobile-ui.css",
+      "kind": "style",
+      "attributes": " id='v414-mobile-ui'"
+    },
+    {
+      "file": "js/02-mobile-ui-js.js",
+      "kind": "script",
+      "attributes": " id='v414-mobile-ui-js'"
+    },
+    {
+      "file": "css/12-glass-ui.css",
+      "kind": "style",
+      "attributes": " id=\"v415-glass-ui\""
+    },
+    {
+      "file": "css/13-delete-project-style.css",
+      "kind": "style",
+      "attributes": " id=\"v416-delete-project-style\""
+    },
+    {
+      "file": "js/03-project-navigation.js",
+      "kind": "script",
+      "attributes": " id=\"v415-project-navigation\""
+    },
+    {
+      "file": "css/14-ui-permissions-polish.css",
+      "kind": "style",
+      "attributes": " id=\"v4154-ui-permissions-polish\""
+    },
+    {
+      "file": "js/04-ui-permissions-js.js",
+      "kind": "script",
+      "attributes": " id=\"v4154-ui-permissions-js\""
+    },
+    {
+      "file": "css/15-regression-fix.css",
+      "kind": "style",
+      "attributes": " id=\"v4155-regression-fix\""
+    },
+    {
+      "file": "css/16-light-theme-polish.css",
+      "kind": "style",
+      "attributes": " id=\"v4156-light-theme-polish\""
+    },
+    {
+      "file": "js/05-navigation-history.js",
+      "kind": "script",
+      "attributes": " id=\"v4159-navigation-history\""
+    },
+    {
+      "file": "css/17-work-view-css.css",
+      "kind": "style",
+      "attributes": " id=\"v41913-work-view-css\""
+    },
+    {
+      "file": "js/06-work-view-js.js",
+      "kind": "script",
+      "attributes": " id=\"v41913-work-view-js\""
+    },
+    {
+      "file": "css/18-site-items-ui.css",
+      "kind": "style",
+      "attributes": " id=\"v41917-site-items-ui\""
+    },
+    {
+      "file": "js/07-site-items-js.js",
+      "kind": "script",
+      "attributes": " id=\"v41917-site-items-js\""
+    }
+  ]
+}

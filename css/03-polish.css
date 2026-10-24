@@ -1,0 +1,42 @@
+
+.top{background:linear-gradient(100deg,#07101d 0%,#101b2d 58%,#253247 100%)}
+body[data-theme='light'] .top{background:linear-gradient(100deg,#e8edf4 0%,#f3f6fa 60%,#ffffff 100%)}
+.brand-home{cursor:pointer;user-select:none}.brand-home:focus-visible{outline:2px solid var(--accent);outline-offset:5px;border-radius:8px}
+.tabs{gap:10px}.tabs .calc-menu{min-width:0;flex:1}
+#searchJobCard h2{margin-bottom:12px}#pjSearch{width:100%}
+.calendar-add-event{margin:12px 0 18px;border:1px solid var(--border);border-radius:16px;overflow:hidden}.calendar-add-event .collapsible-header{padding:14px 16px}
+.diary-notes-label{display:block;margin-top:12px}.diary-notes-label textarea{width:100%;min-height:150px;resize:none;overflow:hidden}
+.global-search-group{margin-top:14px}.global-search-group>h3{margin:10px 0 8px;font-size:1rem}.global-search-result{cursor:pointer}.global-search-result .small{margin-top:4px}
+.global-nav-result{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;padding:12px 0;border:0;border-bottom:1px solid var(--line);background:transparent;color:inherit;text-align:left;font:inherit;cursor:pointer}.global-nav-result:last-child{border-bottom:0}.global-nav-result-main{min-width:0;flex:1}.global-nav-result::after{content:'›';font-size:1.55rem;font-weight:800;color:var(--accent);line-height:1}.global-search-group{max-height:none;overflow:visible}.global-result-count{font-weight:800;color:var(--accent)}.completion-filter-banner{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;margin-bottom:10px;border:1px solid var(--accent);border-radius:10px}.completion-filter-banner .btn{padding:7px 10px;flex:0 0 auto}
+@media(max-width:700px){.top{background:linear-gradient(100deg,#07101d 0%,#111d30 62%,#26344a 100%)}.tabs{grid-template-columns:1fr 1fr!important}.diary-notes-label textarea{min-height:170px}}
+
+/* v4.9.66 final UI correction: these rules are real CSS, not escaped text */
+.tabs{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:10px!important;width:100%!important;max-width:900px!important;overflow:visible!important}
+.tabs .calc-menu{display:block!important;width:100%!important;min-width:0!important;max-width:100%!important;box-sizing:border-box!important;flex:none!important;margin:0!important}
+.tool-page-header,
+#searchJobCard .tool-page-header,
+#dashboard details.site-themed-collapse > summary.collapsible-header,
+#lists details.site-themed-collapse > summary.collapsible-header,
+#completionListPanel > summary.collapsible-header,
+#projectFileImportsPanel > summary.collapsible-header,
+#projects > details.collapsible-card > summary.collapsible-header,
+#sharedGuidancePanel > summary.collapsible-header,
+#regulationReferencesPanel > summary.collapsible-header{
+ background:linear-gradient(100deg,#211d20 0%,#392b28 48%,#604331 100%)!important;
+}
+html:not([data-theme='dark']) .tool-page-header,
+html:not([data-theme='dark']) #searchJobCard .tool-page-header,
+html:not([data-theme='dark']) #dashboard details.site-themed-collapse > summary.collapsible-header,
+html:not([data-theme='dark']) #lists details.site-themed-collapse > summary.collapsible-header,
+html:not([data-theme='dark']) #completionListPanel > summary.collapsible-header,
+html:not([data-theme='dark']) #projectFileImportsPanel > summary.collapsible-header,
+html:not([data-theme='dark']) #projects > details.collapsible-card > summary.collapsible-header,
+html:not([data-theme='dark']) #sharedGuidancePanel > summary.collapsible-header,
+html:not([data-theme='dark']) #regulationReferencesPanel > summary.collapsible-header{
+ background:linear-gradient(100deg,#ece7e4 0%,#ead9ce 52%,#e7c2a8 100%)!important;
+}
+
+/* v4.15.7 — Orders mobile form polish. */
+.site-order-notes-label{display:block;margin-top:12px}
+.site-order-notes-label textarea{display:block;width:100%;box-sizing:border-box;min-height:130px;margin-top:6px;padding:14px 16px;border-radius:12px;line-height:1.45;font-size:16px;resize:vertical;overflow:auto}
+@media(max-width:700px){.site-order-notes-label textarea{min-height:145px}}

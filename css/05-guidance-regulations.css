@@ -1,0 +1,16 @@
+
+#projectRequirementDocs{margin-top:10px}
+#regulationReferencesPanel .fd-reg-context-card{padding:14px!important;margin:0!important;border-radius:14px!important}
+#regulationReferencesPanel .fd-reg-context-card h2{font-size:1rem!important;margin:0 0 5px!important}
+#regulationReferencesPanel .fd-reg-intro{margin:0 0 10px!important;font-size:.78rem!important;line-height:1.35!important}
+#regulationReferencesPanel .fd-reg-context-card>.grid{gap:8px!important}
+#regulationReferencesPanel .fd-reg-context-card label{font-size:.78rem!important}
+#regulationReferencesPanel .fd-reg-context-card select{min-height:42px!important;padding:8px 10px!important}
+#regContextResult.result{padding:0!important;margin-top:10px!important;background:transparent!important;border:0!important}
+.fd-reg-summary{display:grid;gap:7px}.fd-reg-title{font-weight:850;font-size:.92rem;padding:9px 11px;border:1px solid var(--line);border-radius:11px;background:var(--surface2)}
+.fd-reg-check{font-size:.78rem;line-height:1.35;color:var(--muted);padding:0 4px 0 15px;position:relative}.fd-reg-check:before{content:'•';position:absolute;left:4px;color:var(--accent);font-weight:900}
+.fd-reg-links{display:grid;gap:6px;margin-top:2px}.fd-reg-link{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 11px;border:1px solid var(--line);border-radius:11px;background:var(--surface2);text-decoration:none!important;color:var(--text)!important;font-size:.8rem;font-weight:800}
+.fd-reg-link span:last-child{font-size:.68rem;color:var(--muted);font-weight:700;white-space:nowrap}
+#regulationReferencesPanel .card.warn{padding:13px!important;margin-top:10px!important}
+#regulationReferencesPanel .card.warn h2{font-size:.95rem!important;margin:0 0 5px!important}
+#regulationReferencesPanel .card.warn p,#regulationReferencesPanel .card.warn li{font-size:.76rem!important;line-height:1.35!important}

@@ -1,0 +1,11 @@
+
+/* v4.19.17 — Supervisor/Admin work-view switch. UI-only: PocketBase role is unchanged. */
+html[data-work-view="site"] #dashReportsTile,
+html[data-work-view="site"] #projectToolGrid,
+html[data-work-view="site"] #projectDetailsPanel,
+html[data-work-view="site"] #projectFilesGroup,
+html[data-work-view="site"] #projectTeamPanel,
+html[data-work-view="site"] #projectManagementGroup,
+html[data-work-view="site"] #inviteUserPanel,
+html[data-work-view="site"] #sharedGuideAdd,
+html[data-work-view="site"] .management-controls{display:none!important}

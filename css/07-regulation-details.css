@@ -1,0 +1,11 @@
+
+#regulationReferencesPanel .fd-reg-reference-card{padding:0!important;overflow:hidden!important;border-radius:13px!important;margin:8px 0!important}
+#regulationReferencesPanel .fd-reg-reference-card>summary{list-style:none;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 13px;cursor:pointer;font-weight:850;font-size:.86rem;line-height:1.2}
+#regulationReferencesPanel .fd-reg-reference-card>summary::-webkit-details-marker{display:none}
+#regulationReferencesPanel .fd-reg-reference-card>summary::marker{content:''}
+#regulationReferencesPanel .fd-reg-chevron{color:var(--muted);font-size:.9rem;transition:transform .16s ease}
+#regulationReferencesPanel .fd-reg-reference-card[open] .fd-reg-chevron{transform:rotate(180deg)}
+#regulationReferencesPanel .fd-reg-reference-body{padding:0 13px 12px;border-top:1px solid var(--line)}
+#regulationReferencesPanel .fd-reg-reference-body p,
+#regulationReferencesPanel .fd-reg-reference-body li{font-size:.75rem!important;line-height:1.35!important}
+#regulationReferencesPanel .fd-reg-reference-body a{font-size:.75rem!important}

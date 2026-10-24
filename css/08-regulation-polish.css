@@ -1,0 +1,18 @@
+
+/* Keep regulation metadata consistent with the FieldDock dark/glass UI. */
+#regulationReferencesPanel .card.warn .badge{
+  background:color-mix(in srgb,var(--surface2) 86%,transparent)!important;
+  color:var(--text)!important;
+  -webkit-text-fill-color:var(--text)!important;
+  border:1px solid color-mix(in srgb,var(--accent) 42%,var(--line))!important;
+  box-shadow:none!important;
+  margin-top:4px;
+}
+html[data-theme='dark'] #regulationReferencesPanel .card.warn .badge{
+  background:color-mix(in srgb,var(--surface2) 88%,transparent)!important;
+  color:var(--text)!important;
+  -webkit-text-fill-color:var(--text)!important;
+}
+#regulationReferencesPanel .fd-reg-version-note>summary{
+  border-left:3px solid var(--accent);
+}

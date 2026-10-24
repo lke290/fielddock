@@ -1,0 +1,4 @@
+
+/* v4.15.6 — preserve dropdown labels on glass active state. */
+.calc-menu.nav-active{color:var(--text)!important;}
+html[data-theme='dark'] .calc-menu.nav-active{color:var(--text)!important;}
