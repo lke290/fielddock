@@ -1598,17 +1598,21 @@ function scheduleCrossReference(text,detected,p){
 function renderSiteListImportPreview(){let el=$('siteListImportPreviewArea'),status=$('siteListImportStatus');if(!siteListImportDraft.length){el.innerHTML='';$('siteListImportConfirm').disabled=true;return}el.innerHTML=`<div class='small' style='margin-bottom:8px'>Floor and room/location are detected where possible. Check or edit them before importing; Default floor is used only when a row has no detected floor.</div><div class='result' style='margin:0 0 10px;display:flex;gap:8px;align-items:end;flex-wrap:wrap'><label style='min-width:220px;flex:1'>Bulk floor for selected rows<input id='siteListBulkFloor' placeholder='e.g. First Floor'></label><button class='btn' type='button' id='siteListBulkApply'>Apply floor to selected</button><button class='btn' type='button' id='siteListBulkUnresolved'>Select unresolved only</button><button class='btn' type='button' id='siteListBulkToggleAll'>Select all</button></div><div style='display:grid;gap:8px'>${siteListImportDraft.map((r,i)=>`<div class='result site-list-review-row' style='margin:0'><label class='site-list-review-use'><input type='checkbox' data-site-import-use='${i}' ${r.use?'checked':''}><span>Use item</span></label><label class='site-list-review-field site-list-review-item'><span class='site-list-review-label'>Item</span><input data-site-import-text='${i}' value='${esc(r.text)}' style='width:100%'>${r.page?`<span class='small'>Source page ${r.page}</span>`:''}</label><label class='site-list-review-field'><span class='site-list-review-label'>Floor</span><input data-site-import-floor='${i}' value='${esc(r.floor||'')}' placeholder='Floor'></label><label class='site-list-review-field'><span class='site-list-review-label'>Room / location</span><input data-site-import-location='${i}' value='${esc(r.location||'')}' placeholder='Room / location'><span class='small site-list-review-match'>${esc(r.matchSource||'Needs review')}${r.doorRef?` • Door ${esc(r.doorRef)}`:''}</span></label></div>`).join('')}</div>`;el.querySelectorAll('[data-site-import-use]').forEach(x=>x.onchange=()=>siteListImportDraft[+x.dataset.siteImportUse].use=x.checked);el.querySelectorAll('[data-site-import-text]').forEach(x=>x.oninput=()=>siteListImportDraft[+x.dataset.siteImportText].text=x.value);el.querySelectorAll('[data-site-import-floor]').forEach(x=>x.oninput=()=>siteListImportDraft[+x.dataset.siteImportFloor].floor=x.value);el.querySelectorAll('[data-site-import-location]').forEach(x=>x.oninput=()=>siteListImportDraft[+x.dataset.siteImportLocation].location=x.value);$('siteListBulkApply').onclick=()=>{let floor=canonicalSiteFloor($('siteListBulkFloor').value.trim());if(!floor){status.textContent='Enter a floor to apply first.';return}let n=0;siteListImportDraft.forEach(r=>{if(r.use){r.floor=floor;n++}});renderSiteListImportPreview();status.textContent=`Applied ${floor} to ${n} selected entr${n===1?'y':'ies'}.`};$('siteListBulkUnresolved').onclick=()=>{siteListImportDraft.forEach(r=>r.use=!String(r.floor||'').trim());renderSiteListImportPreview();status.textContent='Selected only entries that do not currently have a floor.'};$('siteListBulkToggleAll').onclick=()=>{let allSelected=siteListImportDraft.every(r=>r.use);siteListImportDraft.forEach(r=>r.use=!allSelected);renderSiteListImportPreview();status.textContent=allSelected?'Deselected all preview entries.':'Selected all preview entries.'};let toggle=$('siteListBulkToggleAll');if(toggle)toggle.textContent=siteListImportDraft.every(r=>r.use)?'Deselect all':'Select all';$('siteListImportConfirm').disabled=false;status.textContent=`${siteListImportDraft.length} possible list entries found. Review floor and location before confirming.`}
 $('siteListImportPreview')?.addEventListener('click',async()=>{siteListImportNoteSource='';siteListImportSourceNote=null;let p=activeProject(),file=$('siteListImportFile')?.files?.[0],status=$('siteListImportStatus');if(!p){status.textContent='Select a project first.';return}if(!file){status.textContent='Choose a PDF, ODT, text or CSV file first.';return}try{status.textContent='Reading file…';let rows=await extractSiteListFile(file);if(!rows.length)throw new Error('No usable text was found. This may be a scanned/image-only PDF.');siteListImportDraft=rows.map(r=>{let detected=detectImportedSiteLocation(r.text);return {...r,...scheduleCrossReference(r.text,detected,p),use:true}});if(!$('siteListImportCategory').value)$('siteListImportCategory').value=file.name.replace(/\.[^.]+$/,'');renderSiteListImportPreview()}catch(e){siteListImportDraft=[];renderSiteListImportPreview();status.textContent='Could not extract list: '+e.message}});
 $('siteListImportClear')?.addEventListener('click',()=>{siteListImportDraft=[];siteListImportNoteSource='';siteListImportSourceNote=null;$('siteListImportFile').value='';$('siteListImportPreviewArea').innerHTML='';$('siteListImportStatus').textContent='';$('siteListImportConfirm').disabled=true});
-// v4.20 stability: mirror confirmed personal-note items into backend snags.
+// v4.20 stability: mirror confirmed note and external-list items into backend snags.
 async function createConfirmedNoteSnags(project,sourceNote,items){
   const user=pbAuth()?.record;
   if(!user?.id)throw new Error('Sign in again before processing a note.');
-  const existing=[];
+  async function readSnags(){
+  const records=[];
   for(let page=1;;page++){
     const query=new URLSearchParams({page:String(page),perPage:'200',filter:'project='+JSON.stringify(project.id)+' && source_note='+JSON.stringify(sourceNote.id)});
     const data=await pbRequest('/api/collections/snags/records?'+query,{cache:'no-store'});
-    existing.push(...(data.items||[]));
+    records.push(...(data.items||[]));
     if(page>=(data.totalPages||1))break;
   }
+  return records;
+  }
+  const existing=await readSnags();
   // Consume matches once so repeated identical lines still produce separate records.
   for(const item of items){
     const match=existing.findIndex(r=>r.description===item.title&&String(r.floor||'')===item.floor&&String(r.location||'')===item.location&&r.created_by===user.id);
@@ -1618,18 +1622,32 @@ async function createConfirmedNoteSnags(project,sourceNote,items){
       floor:item.floor,location:item.location,status:'open',created_by:user.id
     })});
   }
+  // Read back persisted records before reporting success; consume duplicate lines separately.
+  const verified=await readSnags();
+  for(const item of items){
+    const match=verified.findIndex(r=>r.description===item.title&&String(r.floor||'')===item.floor&&String(r.location||'')===item.location&&r.created_by===user.id);
+    if(match<0)throw new Error('A saved snag could not be verified. Retry Confirm.');
+    verified.splice(match,1);
+  }
 }
 let siteListImportConfirmBusy=false;
 $('siteListImportConfirm')?.addEventListener('click',async()=>{if(siteListImportConfirmBusy)return;let p=activeProject(),status=$('siteListImportStatus');if(!p){status.textContent='Select a project first.';return}let chosen=siteListImportDraft.filter(x=>x.use&&cleanImportLine(x.text));if(!chosen.length){status.textContent='No preview rows are selected.';return}let now=new Date().toISOString(),file=$('siteListImportFile')?.files?.[0],cat=$('siteListImportCategory').value.trim()||'Imported list',floor=$('siteListImportFloor').value.trim(),sourceNote=siteListImportSourceNote?{...siteListImportSourceNote}:null;let items=chosen.map(r=>({id:r._confirmedSiteItemId||(r._confirmedSiteItemId=newId('siteitem')),list:cat,floor:canonicalSiteFloor(String(r.floor||'').trim()||floor),location:String(r.location||'').trim(),title:cleanImportLine(r.text),priority:'Normal',assigned:'',due:'',notes:`Imported from ${siteListImportNoteSource||file?.name||'file'}${r.page?' • page '+r.page:''}${r.doorRef?' • matched door '+r.doorRef:''}`,doorRef:r.doorRef||'',status:'open',createdAt:now,updatedAt:now,createdBy:currentUserName(),completedAt:'',completedBy:''}));if(sourceNote&&p._pocketbase&&sourceNote._processProjectId!==p.id){status.textContent='The project has changed. Process the note again in its original project.';return}siteListImportConfirmBusy=true;$('siteListImportConfirm').disabled=true;try{
-if(sourceNote&&p._pocketbase){
+if(p._pocketbase){
   if(!pbAuth()?.record?.id)throw new Error('Sign in again before processing a note.');
   await loadProjectNotes();
-  const projectNote=await createProjectNoteFromPersonal(sourceNote);
+  // Retain a stable source on the draft so a partial failure can be retried.
+  const draftSource=sourceNote||siteListImportDraft._externalSource||(siteListImportDraft._externalSource={
+    title:cat+' — '+(file?.name||siteListImportNoteSource||'Imported list'),
+    text:'External list: '+(file?.name||siteListImportNoteSource||'file')+'\n\n'+chosen.map(r=>cleanImportLine(r.text)).join('\n'),
+    _processProjectId:p.id
+  });
+  if(draftSource._processProjectId!==p.id)throw new Error('Return to the original project before retrying this import.');
+  const projectNote=await createProjectNoteFromPersonal(draftSource);
   if(!projectNote?.id)throw new Error('The project note could not be created.');
   try{await createConfirmedNoteSnags(p,projectNote,items)}catch(e){throw new Error('Backend snags failed: '+e.message)}
 }
 if(activeProject()?.id!==p.id)throw new Error('The project changed during import. Return to the original project and retry Confirm.');
-await saveSiteItems([...items,...siteItemsForProject().filter(x=>!items.some(item=>item.id===x.id))]);status.textContent=`Imported ${items.length} items into “${cat}”.${sourceNote?' Note moved to Processed notes and shared with the project.':''}${sourceNote&&p._pocketbase?' Backend snags verified: '+items.length+'.':''}`;siteListImportDraft=[];siteListImportNoteSource='';siteListImportSourceNote=null;$('siteListImportPreviewArea').innerHTML='';$('siteListImportConfirm').disabled=true;await renderSiteItems();await renderSiteNotes()}catch(e){status.textContent='Could not import list: '+e.message+' Saved records are kept; retry Confirm to finish.'}finally{siteListImportConfirmBusy=false;$('siteListImportConfirm').disabled=!siteListImportDraft.length}});
+await saveSiteItems([...items,...siteItemsForProject().filter(x=>!items.some(item=>item.id===x.id))]);status.textContent=`Imported ${items.length} items into “${cat}”.${sourceNote?' Note moved to Processed notes and shared with the project.':''}${p._pocketbase?' Backend snags verified: '+items.length+'.':''}`;siteListImportDraft=[];siteListImportNoteSource='';siteListImportSourceNote=null;$('siteListImportPreviewArea').innerHTML='';$('siteListImportConfirm').disabled=true;await renderSiteItems();await renderSiteNotes()}catch(e){status.textContent='Could not import list: '+e.message+' Saved records are kept; retry Confirm to finish.'}finally{siteListImportConfirmBusy=false;$('siteListImportConfirm').disabled=!siteListImportDraft.length}});
 $('sharedGuideAdd')?.addEventListener('click',async()=>{let file=$('sharedGuideFile')?.files?.[0],title=$('sharedGuideTitle')?.value.trim(),status=$('sharedGuideStatus');if(!file){status.textContent='Choose a PDF first.';return}if(!title)title=file.name.replace(/\.pdf$/i,'');let fd=new FormData();fd.append('title',title);fd.append('type',$('sharedGuideType').value);fd.append('revision',$('sharedGuideRevision').value.trim());fd.append('keywords',$('sharedGuideKeywords').value.trim());fd.append('original_name',file.name);fd.append('mime_type',file.type||'application/pdf');fd.append('file',file,file.name);try{status.textContent='Uploading…';let res=await pbFetch(PB_BASE+'/api/collections/shared_guidance/records',{method:'POST',headers:pbHeaders(false),body:fd});if(!res.ok){let j=await res.json().catch(()=>({}));throw new Error(pbValidationMessage(j,'Shared guide upload failed.'))}['sharedGuideTitle','sharedGuideRevision','sharedGuideKeywords'].forEach(id=>$(id).value='');$('sharedGuideFile').value='';status.textContent='Shared guide uploaded. It is now available from every project.';await renderSharedGuidance();renderCompletion();searchProject()}catch(e){status.textContent='Could not upload shared guide: '+e.message}});
 const PROJECT_REQUIREMENT_TYPES=new Set(['Client instruction','Installation guide','Manufacturer instruction','Project specification','Project guidance']);
 $('reqFile')?.addEventListener('change',()=>{const f=$('reqFile').files?.[0];if(f&&!$('reqTitle').value.trim())$('reqTitle').value=f.name.replace(/\.pdf$/i,'').replace(/[_-]+/g,' ')});
@@ -2804,4 +2822,5 @@ html[data-work-view="site"] .management-controls{display:none!important}
 })();
 </script>
 </body></html>
+
 
