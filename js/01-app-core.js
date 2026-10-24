@@ -567,9 +567,18 @@ async function deleteDoorPhoto(photoId,recordId){
   }
   await refreshPhotoUI(recordId)
 }
+const photoRefreshRequests=new Map();
 async function refreshPhotoUI(recordId){
   let d=projectsData(),projectId=d.active;if(!projectId)return;
-  let photos=await photosFor(projectId,recordId);
+  const key=projectId+'/'+recordId,request={};
+  photoRefreshRequests.set(key,request);
+  let photos;
+  try{photos=await photosFor(projectId,recordId)}
+  catch(error){if(photoRefreshRequests.get(key)===request)photoRefreshRequests.delete(key);throw error}
+  // A slower pre-upload read must not replace a newer gallery/count or another project.
+  if(photoRefreshRequests.get(key)!==request)return;
+  photoRefreshRequests.delete(key);
+  if(projectsData().active!==projectId)return;
   document.querySelectorAll(`[data-photo-count="${recordId}"]`).forEach(el=>el.textContent=`Photos: ${photos.length}`);
   document.querySelectorAll(`[data-photo-gallery="${recordId}"]`).forEach(g=>{
     g.innerHTML='';

@@ -1,7 +1,9 @@
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),assert=require('node:assert/strict'),cp=require('node:child_process');
-const root=path.resolve(__dirname,'..'),read=f=>fs.readFileSync(path.join(root,f),'utf8');
+// Git's Windows checkout can use CRLF while git show returns LF. Compare source,
+// not checkout line endings; leave the frozen baseline and application files intact.
+const root=path.resolve(__dirname,'..'),read=f=>fs.readFileSync(path.join(root,f),'utf8').replace(/\r\n/g,'\n');
 const meta=JSON.parse(read('baseline/extraction.json')),original=read('baseline/index.html'),html=read('index.html');
-assert.equal(original,cp.execFileSync('git',['show',meta.revision+':index.html'],{cwd:root}).toString());
+assert.equal(original,cp.execFileSync('git',['show',meta.revision+':index.html'],{cwd:root}).toString().replace(/\r\n/g,'\n'));
 let rebuilt=html;
 for(const asset of meta.assets){
  const body=read(asset.file);
@@ -18,8 +20,8 @@ let compared=rebuilt.replace(/\/\* Native door snag dialog \*\/[\s\S]*?\/\* End 
 // Permit only the exact upload-container selector correction.
 assert.equal(compared.split("inp.closest('.photo-tools, .compact-photo-tools')").length,2);
 compared=compared.replace("inp.closest('.photo-tools, .compact-photo-tools')","inp.closest('.photo-tools')");
-for(const [start,end] of [['function mapPbPhoto(', 'function pbPhotoKind('],['async function refreshPhotoUI(', 'function bindPhotoControls('],['// Native door snags:', 'function completionState('],['function completionCard(', 'async function renderCompletion('],["async function ensurePbAuth(","window.addEventListener('storage'"]]){
- const baselineStart=start==='// Native door snags:'?'async function setSnagResolved(':start;
+for(const [start,end] of [['function mapPbPhoto(', 'function pbPhotoKind('],['const photoRefreshRequests=', 'function bindPhotoControls('],['// Native door snags:', 'function completionState('],['function completionCard(', 'async function renderCompletion('],["async function ensurePbAuth(","window.addEventListener('storage'"]]){
+ const baselineStart=start==='// Native door snags:'?'async function setSnagResolved(':start==='const photoRefreshRequests='?'async function refreshPhotoUI(':start;
  const a=compared.indexOf(start),b=compared.indexOf(end,a);
  assert(a>=0&&b>a);
  compared=compared.slice(0,a)+original.slice(original.indexOf(baselineStart),original.indexOf(end,original.indexOf(baselineStart)))+compared.slice(b);

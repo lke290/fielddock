@@ -17,7 +17,7 @@ const server=http.createServer((req,res)=>{
   for(const width of [390,1440]){
    const snapshots=[];
    for(const route of ['/baseline.html','/','/fielddock/']){
-    const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:'block'});
+    const context=await browser.newContext({viewport:{width,height:900},hasTouch:width===390,serviceWorkers:'block'});
     await context.route('**/*',r=>new URL(r.request().url()).origin===origin?r.continue():r.abort());
     const page=await context.newPage(),errors=[],missing=[];
     page.on('pageerror',e=>errors.push(e.message));page.on('response',r=>{if(r.status()>=400)missing.push(r.url())});
@@ -34,6 +34,7 @@ const server=http.createServer((req,res)=>{
      await require('./photo-regressions.cjs')(page);
      await require('./photo-session-regressions.cjs')(page);
      await require('./snag-regressions.cjs')(page);
+     await require('./completion-interaction-regressions.cjs')(page);
     }
     assert.deepEqual(errors,[],`${route} workflow runtime errors`);
     await context.close();
