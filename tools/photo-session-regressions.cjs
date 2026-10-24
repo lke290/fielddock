@@ -59,6 +59,7 @@ module.exports=async function photoSessionRegressions(page){
    host.querySelectorAll('details:not([open]) > summary').forEach(s=>s.click());
    const images=[...host.querySelectorAll('img')];images.forEach(i=>i.loading='eager');await Promise.all(images.map(i=>i.decode()));
    check(images.every(i=>i.naturalWidth>0&&i.getClientRects().length>0),'Current classified and Other images decode and are visible');
+   check(host.querySelector('[data-snag-photos]').hidden,'Empty snag photo gallery stays hidden');
    const initial=sections();check(count()==='Photos: 7','Initial persisted count');
    const hardware=host.querySelector('.completion-hardware').outerHTML;
    for(let i=0;i<12;i++)check(hardware.includes('Hardware item '+i),'All existing hardware renders');
@@ -86,8 +87,8 @@ module.exports=async function photoSessionRegressions(page){
    pbVerifiedToken=oldVerified;applyAuth();
   }
  });
- assert.deepEqual(result.initial,{frame:['existing-frame'],door:['existing-door'],iron:['existing-iron'],other:['legacy-other-0','legacy-other-1','legacy-other-2','legacy-other-3']});
- assert.deepEqual(result.successful,{frame:['existing-frame','created-7'],door:['existing-door','created-8'],iron:['existing-iron','created-9'],other:['legacy-other-0','legacy-other-1','legacy-other-2','legacy-other-3']});
+ assert.deepEqual(result.initial,{frame:['existing-frame'],door:['existing-door'],iron:['existing-iron'],snag:[],other:['legacy-other-0','legacy-other-1','legacy-other-2','legacy-other-3']});
+ assert.deepEqual(result.successful,{frame:['existing-frame','created-7'],door:['existing-door','created-8'],iron:['existing-iron','created-9'],snag:[],other:['legacy-other-0','legacy-other-1','legacy-other-2','legacy-other-3']});
  assert.deepEqual(result.requests.slice(0,3),[
   ['photo-project','photo-door','frame_fitted','installation','Frame fitted'],
   ['photo-project','photo-door','door_fitted','installation','Door fitted'],

@@ -31,13 +31,16 @@ module.exports=async function photoRegressions(page){
    const visible=images.every(img=>img.naturalWidth>0&&img.getClientRects().length>0);
    const sections={};
    host.querySelectorAll('[data-photo-gallery]').forEach(g=>sections[g.dataset.photoFilter]=[...g.querySelectorAll('img')].map(i=>new URL(i.src).pathname.split('/').at(-2)));
+   const snagGallery=host.querySelector('[data-photo-filter=snag]');
+   if(!snagGallery||!snagGallery.closest('.compact-extra')?.querySelector('summary')?.textContent.includes('Snags'))throw new Error('Snag photos must be inside the Snags section');
+   if(snagGallery.closest('.compact-stage'))throw new Error('Snag photos must not appear in an installation stage');
    const count=host.querySelector('[data-photo-count]').textContent;
    // Existing controls still exist on every rendered image.
    const controls=[host.querySelectorAll('.photo-item').length,host.querySelectorAll('.photo-item button').length];
    return {sections,count,controls,visible,urls:mapped.map(p=>p.url),kinds:mapped.map(p=>p.kind)};
   }finally{projectsData=oldProjects;photosFor=oldPhotos;host.remove()}
  });
- assert.deepEqual(result.sections,{frame:['frame','caption'],door:['door','legacy','snake'],iron:['iron','snag','legacy-kind','group'],other:['other','empty','installation']});
+ assert.deepEqual(result.sections,{frame:['frame','caption'],door:['door','legacy','snake'],iron:['iron','legacy-kind'],snag:['snag'],other:['other','empty','group','installation']});
  assert.equal(result.count,'Photos: 12');assert.deepEqual(result.controls,[12,12]);
  assert.equal(result.visible,true,'All fixture images decode and are visible when photo sections are open');
  assert(result.urls.every(u=>/\/api\/files\/door_photos\//.test(u)));
@@ -84,6 +87,8 @@ module.exports=async function photoRegressions(page){
    await refreshPhotoUI('door-id');
    const sections={};
    host.querySelectorAll('[data-photo-gallery]').forEach(g=>sections[g.dataset.photoFilter]=[...g.querySelectorAll('img')].map(i=>new URL(i.src).pathname.split('/').at(-2)));
+   const orphanGallery=host.querySelector('[data-photo-filter=snag]');
+   if(!orphanGallery||orphanGallery.closest('[data-snag-photos]').hidden)throw new Error('Existing snag photos remain visible even when there are no snag entries');
    return {requests,alerts,sections};
   }finally{Object.assign(window,old);window.alert=oldAlert;host.remove()}
  });
@@ -99,6 +104,6 @@ module.exports=async function photoRegressions(page){
   assert.deepEqual([r.project,r.door,r.user],['project','door-id','uploader']);
   assert.deepEqual(r.files,[['test.jpg',5],['test.jpg',5]]);
  }
- assert.deepEqual(uploads.sections,{frame:['upload-0'],door:['upload-1','upload-5'],iron:['upload-2','upload-3'],other:['upload-4']});
+ assert.deepEqual(uploads.sections,{frame:['upload-0'],door:['upload-1','upload-5'],iron:['upload-2'],snag:['upload-3'],other:['upload-4']});
  console.log('PASS: real file-input handlers create correct multipart metadata for all three stages, snags, explicit Other and legacy controls; saved records render in their sections after card recreation.');
 };

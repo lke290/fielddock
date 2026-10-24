@@ -29,4 +29,5 @@
 .native-door-snag-dialog input{max-width:100%}
 .native-door-snag-dialog p{overflow-wrap:anywhere}
 .native-door-snag-dialog .btn{min-height:44px}
+.door-snag-photos{grid-column:1/-1}
 /* End native door snag dialog */
