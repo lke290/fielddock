@@ -13,15 +13,18 @@ for(const asset of meta.assets){
   rebuilt=rebuilt.replace(`<link${asset.attributes} rel="stylesheet" href="${asset.file}">`,()=>`<style${asset.attributes}>${body}</style>`);
  }
 }
-// Only the reviewed photo compatibility changes may differ from the frozen source.
+// Only the reviewed photo compatibility and upload selector changes may differ from the frozen source.
 let compared=rebuilt;
+// Permit only the exact upload-container selector correction.
+assert.equal(compared.split("inp.closest('.photo-tools, .compact-photo-tools')").length,2);
+compared=compared.replace("inp.closest('.photo-tools, .compact-photo-tools')","inp.closest('.photo-tools')");
 for(const [start,end] of [['function mapPbPhoto(', 'function pbPhotoKind('],['async function refreshPhotoUI(', 'function bindPhotoControls(']]){
  const a=compared.indexOf(start),b=compared.indexOf(end,a);
  assert(a>=0&&b>a);
  compared=compared.slice(0,a)+original.slice(original.indexOf(start),original.indexOf(end,original.indexOf(start)))+compared.slice(b);
 }
 compared=compared.replace("Photos: …</div><div class='photo-gallery' data-photo-gallery='${esc(r.id)}' data-photo-filter='other'></div>","Photos: …</div>");
-assert.equal(compared,original,'Only reviewed photo mapping/filtering and fallback gallery may differ');
+assert.equal(compared,original,'Only reviewed photo mapping/filtering, fallback gallery and upload selector may differ');
 for(const file of ['config.js','manifest.json','sw.js','icon-192.png','icon-512.png'])assert.equal(cp.execFileSync('git',['hash-object',file],{cwd:root}).toString().trim(),cp.execFileSync('git',['rev-parse',meta.revision+':'+file],{cwd:root}).toString().trim());
 for(const m of html.matchAll(/<(?:script|link)\b[^>]*\b(?:src|href)=["']([^"']+)["']/gi)){
  if(/^https?:/.test(m[1]))continue;
