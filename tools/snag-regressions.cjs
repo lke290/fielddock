@@ -39,6 +39,11 @@ module.exports=async function snagRegressions(page){
    check(form(),'Report snag opens form');
    check(form().querySelector('[data-snag-context]').textContent.includes('D-2'),'Form identifies clicked door');
    check(!form().querySelector('select'),'No project/door selection required');
+   const snagPhoto=form().elements.photo;
+   const completionPhoto=host.querySelector('.compact-stage .door-photo-input');
+   check(snagPhoto.type==='file','Snag photo keeps the desktop file-input fallback');
+   check(snagPhoto.accept===completionPhoto.accept,'Snag and completion photos accept the same image types');
+   check(snagPhoto.getAttribute('capture')===completionPhoto.getAttribute('capture')&&snagPhoto.getAttribute('capture')==='environment','Snag photo requests the same rear camera as completion photos');
    const rect=form().closest('dialog').getBoundingClientRect();
    check(rect.left>=0&&rect.right<=innerWidth&&rect.height<=innerHeight,'Dialog fits mobile/desktop viewport');
    form().elements.description.value='   ';await send();check(writes===0,'Whitespace-only description cannot save');

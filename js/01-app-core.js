@@ -1273,7 +1273,7 @@ function openNativeDoorSnag(projectId,recordId){
   dialog.id='nativeDoorSnagDialog';
   dialog.className='native-door-snag-dialog';
   dialog.setAttribute('aria-labelledby','nativeDoorSnagTitle');
-  dialog.innerHTML="<form><h2 id='nativeDoorSnagTitle'>Report snag</h2><p class='small' data-snag-context></p><label>Description<textarea name='description' required rows='4'></textarea></label><label>Photo (optional)<input name='photo' type='file' accept='image/*'></label><p class='small' role='status' aria-live='polite'></p><div class='customise'><button type='submit' class='btn primary'>Save snag</button><button type='button' class='btn' data-snag-close>Cancel</button></div></form>";
+  dialog.innerHTML="<form><h2 id='nativeDoorSnagTitle'>Report snag</h2><p class='small' data-snag-context></p><label>Description<textarea name='description' required rows='4'></textarea></label><label>Photo (optional)<input name='photo' type='file' accept='image/*' capture='environment'></label><p class='small' role='status' aria-live='polite'></p><div class='customise'><button type='submit' class='btn primary'>Save snag</button><button type='button' class='btn' data-snag-close>Cancel</button></div></form>";
   const form=dialog.querySelector('form'),description=form.elements.description,photo=form.elements.photo,status=dialog.querySelector('[role=status]'),submit=form.querySelector('[type=submit]'),close=form.querySelector('[data-snag-close]');
   dialog.querySelector('[data-snag-context]').textContent=ctx.label;
   const dismiss=()=>{if(!draft.busy){dialog.close();dialog.remove()}};
