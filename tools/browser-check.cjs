@@ -32,8 +32,10 @@ const server=http.createServer((req,res)=>{
     snapshots.push(state);
     if(route!=='/baseline.html'){
      await require('./photo-regressions.cjs')(page);
+     await require('./photo-session-regressions.cjs')(page);
      await require('./snag-regressions.cjs')(page);
     }
+    assert.deepEqual(errors,[],`${route} workflow runtime errors`);
     await context.close();
    }
    assert.deepEqual(snapshots[1],snapshots[0],`root DOM/styles/globals at ${width}`);

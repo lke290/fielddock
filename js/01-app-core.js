@@ -1557,16 +1557,17 @@ async function ensurePbAuth(){
   if(pbRefreshPromise&&pbRefreshToken===token)return pbRefreshPromise;
   const pending=(async()=>{
     let res;
+    // Network/server failures cannot prove an already verified session invalid.
+    // Leave it intact, but fail this operation rather than send an unverified write.
     try{res=await fetch(PB_BASE+'/api/collections/users/auth-refresh',{
       method:'POST',cache:'no-store',headers:{Authorization:token}
-    })}catch(e){pbVerifiedToken='';applyAuth();throw new Error('FieldDock cannot verify your session. Check your connection and try again.')}
+    })}catch(e){throw new Error('FieldDock cannot verify your session. Check your connection and try again.')}
     const data=await res.json().catch(()=>null);
     // A logout or another tab/account must never be overwritten by an older refresh.
     if(pbAuth()?.token!==token)throw new Error('Your FieldDock account changed. Please try again.');
     if(!res.ok){
-      pbVerifiedToken=''; 
       if(res.status===401||res.status===403){clearPbAuth();throw pbSessionError()}
-      applyAuth();throw new Error('FieldDock could not verify your session (HTTP '+res.status+'). Please try again.');
+      throw new Error('FieldDock could not verify your session (HTTP '+res.status+'). Please try again.');
     }
     if(!data?.token||data?.record?.id!==a.record.id){clearPbAuth();throw pbSessionError()}
     localStorage.setItem(PB_AUTH_KEY,JSON.stringify(data));pbVerifiedToken=data.token;applyAuth();
@@ -1584,8 +1585,15 @@ async function pbFetch(url,options={},publicRequest=false){
     if(pbAuth()?.token!==a.token)throw new Error('Your FieldDock account changed. Please try again.');
     headers.set('Authorization',a.token);
   }else headers.delete('Authorization');
-  const res=await fetch(url,{...options,headers,cache:'no-store'});
-  if(a&&res.status===401&&pbAuth()?.token===a.token){clearPbAuth();throw pbSessionError()}
+  let res=await fetch(url,{...options,headers,cache:'no-store'});
+  if(a&&res.status===401&&pbAuth()?.token===a.token){
+    // A rejected collection request is not proof that the account session expired.
+    // Verify once and retry only the rejected request; auth-refresh owns invalidation.
+    const refreshed=await ensurePbAuth();
+    if(pbAuth()?.token!==refreshed.token)throw new Error('Your FieldDock account changed. Please try again.');
+    headers.set('Authorization',refreshed.token);
+    res=await fetch(url,{...options,headers,cache:'no-store'});
+  }
   return res;
 }
 window.addEventListener('storage',e=>{if(e.key===PB_AUTH_KEY||e.key===null){pbVerifiedToken='';applyAuth()}});
