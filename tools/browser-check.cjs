@@ -30,7 +30,10 @@ const server=http.createServer((req,res)=>{
     }));
     assert.deepEqual(errors,[],`${route} runtime errors`);assert.deepEqual(missing,[],`${route} missing resources`);
     snapshots.push(state);
-    if(route!=='/baseline.html')await require('./photo-regressions.cjs')(page);
+    if(route!=='/baseline.html'){
+     await require('./photo-regressions.cjs')(page);
+     await require('./snag-regressions.cjs')(page);
+    }
     await context.close();
    }
    assert.deepEqual(snapshots[1],snapshots[0],`root DOM/styles/globals at ${width}`);

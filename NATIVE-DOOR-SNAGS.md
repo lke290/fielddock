@@ -1,0 +1,17 @@
+# Native door snag workflow
+
+Door snags remain authoritative in `schedule_records.snags_json`. This workflow does not write the PocketBase `snags` collection or project site lists, and does not change completion calculations, roles, authentication or the service worker.
+
+The existing Report snag placeholder now opens a small dialog with the captured project/door context, required description and optional photo. Doors with existing/imported snags also offer Report another snag. Creation and resolve/reopen read the latest schedule record, verify its project, preserve the existing array and patch only `snags_json`. Local display/cache updates follow a confirmed PATCH response. Operations from this page are serialized per project/door. Imported entries without IDs are matched against their unchanged content; ambiguous or changed entries fail safely rather than resolving a different entry.
+
+New entries carry a stable JSON ID for retry recovery after an interrupted save. The form retains that entry and its description after an attempted save, so retry cannot append the same snag twice. Double submission is disabled. Project/account changes before writing stop the operation; a write already in flight remains attached to its captured record. Returning to the original project/account allows retry. Draft/retry state is held in the open dialog and is not an offline outbox; closing/reloading discards that unsaved form state.
+
+Optional photos use the existing `door_photos` uploader with caption `Defect / snag`, kind `defect_snag` and group `ironmongery_snag`. They remain door-level evidence, not individual-snag attachments. Photo failure leaves the saved snag visible and keeps a Retry photo action plus Done. Photo retry does not recreate the snag. An interrupted photo response can still mean the photo reached PocketBase; check the existing door gallery before retrying if the connection was lost.
+
+## Validation
+
+- `node tools/validate.cjs`: parsing, frozen-source comparison outside the reviewed photo/native-snag changes, supporting assets and existing authentication regressions.
+- `node tools/browser-check.cjs`: existing startup/photo checks plus native snag regressions on root/subfolder routes at 390 and 1440 pixels. Tests exercise real dialog submission and checkbox bindings with mocked PocketBase requests. Coverage includes exact association, fresh server-only/imported entries, multiple snags, duplicate submission, save denial, lost response/retry, photo failure/retry, resolve/reopen and rollback, mapper-based reload, project/account changes, navigation during read/write, invalid JSON arrays and local-only projects. Dialog bounds are checked at both widths.
+- The new dialog was visually inspected in headless Edge at both widths.
+
+These checks do not exercise live PocketBase rules or real mobile cameras. Test with actual Admin/Supervisor/Joiner accounts, reload on another device, try failed connectivity and photo retry, and verify installed-PWA navigation/keyboard/file selection. Fresh read/modify/write reduces stale overwrites but is not an atomic cross-device transaction: two clients can still race between GET and PATCH. No backend transaction or schema change is included.

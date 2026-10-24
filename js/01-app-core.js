@@ -1192,7 +1192,126 @@ function renderSnagPreview(){let a=$('snagPreviewArea'),p=activeProject();if(!a|
 $('snagPreview')?.addEventListener('click',async()=>{let p=activeProject(),file=$('snagFile')?.files?.[0];if(!p){$('snagStatus').textContent='Select a project first.';return}if(!file){$('snagStatus').textContent='Choose a snag file first.';return}try{$('snagStatus').textContent='Reading snag list and matching doors/rooms…';if(p._pocketbase)await syncPocketBaseSchedules(p.id);p=activeProject();let rows=await extractSnagFile(file);snagDraft=rows.map(x=>({...x,...snagCandidates(x,p.records||[])}));if(!$('snagSource').value)$('snagSource').value=file.name.replace(/\.(pdf|csv|json)$/i,'');if(/SLedger25042917470/i.test(file.name)&&!$('snagRevision').value)$('snagRevision').value='29 Apr 2025';renderSnagPreview()}catch(e){$('snagStatus').textContent='Could not extract snag list: '+e.message}})
 $('snagClear')?.addEventListener('click',()=>{snagDraft=[];$('snagPreviewArea').innerHTML='';$('snagStatus').textContent='';$('snagConfirm').disabled=true})
 $('snagConfirm')?.addEventListener('click',async()=>{let p=activeProject();if(!p)return;let selected=[...document.querySelectorAll('.snag-use:checked')].map(x=>snagDraft[+x.dataset.i]).filter(Boolean),chosen=selected.filter(x=>x.record),general=selected.filter(x=>x.general),source=$('snagSource').value.trim()||'Snag report',revision=$('snagRevision').value.trim();if(!selected.length)return;try{$('snagConfirm').disabled=true;$('snagStatus').textContent=`Saving ${chosen.length} door snags and ${general.length} general snags…`;let by={};for(const x of chosen)(by[x.record.id]??=[]).push({item:x.item,location:x.location,description:x.description,page:x.page,source,revision,status:'Outstanding',resolvedAt:''});for(const [id,items] of Object.entries(by)){let r=(p.records||[]).find(x=>String(x.id)===String(id)),existing=Array.isArray(r?.snagItems)?r.snagItems:[];let merged=[...existing];for(const it of items){let key=[it.source,it.item,it.description].join('|');if(!merged.some(z=>[z.source,z.item,z.description].join('|')===key))merged.push(it)}if(p._pocketbase)await pbRequest('/api/collections/schedule_records/records/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify({snags_json:JSON.stringify(merged)})});else r.snagItems=merged}if(general.length){let items=general.map(x=>({item:x.item,location:x.location,description:x.description,page:x.page,source,revision,status:'Outstanding',resolvedAt:''}));if(p._pocketbase){let fresh=await pbRequest('/api/collections/projects/records/'+encodeURIComponent(p.id)),existing=[];try{existing=JSON.parse(fresh.general_snags_json||'[]')}catch(e){}for(const it of items){let key=[it.source,it.item,it.description].join('|');if(!existing.some(z=>[z.source,z.item,z.description].join('|')===key))existing.push(it)}await pbRequest('/api/collections/projects/records/'+encodeURIComponent(p.id),{method:'PATCH',body:JSON.stringify({general_snags_json:JSON.stringify(existing)})})}else{p.generalSnags=Array.isArray(p.generalSnags)?p.generalSnags:[];for(const it of items)if(!p.generalSnags.some(z=>[z.source,z.item,z.description].join('|')===[it.source,it.item,it.description].join('|')))p.generalSnags.push(it)}}if(!p._pocketbase)saveProjectsData(projectsData());else await syncPocketBaseSchedules(p.id);$('snagStatus').innerHTML=`✓ <b>${chosen.length} door snags attached</b>${general.length?` • <b>${general.length} general snags retained</b>`:''}.`;renderCompletion();searchProject();renderProjectRecords()}catch(e){$('snagStatus').textContent='Could not save snags: '+e.message}finally{$('snagConfirm').disabled=false}})
-async function setSnagResolved(recId,index,resolved){let p=activeProject(),r=(p?.records||[]).find(x=>String(x.id)===String(recId));if(!p||!r)return;let a=Array.isArray(r.snagItems)?r.snagItems:[];if(!a[index])return;a[index].status=resolved?'Resolved':'Outstanding';a[index].resolvedAt=resolved?new Date().toISOString():'';if(p._pocketbase){await pbRequest('/api/collections/schedule_records/records/'+encodeURIComponent(recId),{method:'PATCH',body:JSON.stringify({snags_json:JSON.stringify(a)})});await syncPocketBaseSchedules(p.id)}else saveProjectsData(projectsData());renderCompletion();searchProject()}
+// Native door snags: keep schedule JSON authoritative; never write the snags collection.
+const doorSnagWrites=new Map();
+function queueDoorSnagWrite(key,work){
+  const next=(doorSnagWrites.get(key)||Promise.resolve()).catch(()=>{}).then(work);
+  doorSnagWrites.set(key,next);
+  return next.finally(()=>{if(doorSnagWrites.get(key)===next)doorSnagWrites.delete(key)});
+}
+function doorSnagContext(projectId,recordId){
+  const p=projectsData().items[projectId],r=p?.records?.find(x=>String(x.id)===String(recordId));
+  if(!p||!r)throw new Error('This door is no longer available. Reopen it and try again.');
+  return {projectId,recordId,cloud:!!p._pocketbase,userId:pbAuth()?.record?.id||'',label:[p.name,r.door,r.floor,r.room].filter(Boolean).join(' • '),location:[r.floor,r.room,r.roomNo].filter(Boolean).join(' • ')};
+}
+function checkDoorSnagContext(ctx){
+  if(projectsData().active!==ctx.projectId)throw new Error('Return to the original project to finish this snag.');
+  if(ctx.cloud&&(!ctx.userId||pbAuth()?.record?.id!==ctx.userId))throw new Error('Return to the original signed-in account to finish this snag.');
+}
+function readDoorSnagArray(value){
+  const items=typeof value==='string'?JSON.parse(value||'[]'):(value??[]);
+  if(!Array.isArray(items))throw new Error('Existing snag data is invalid; nothing was overwritten.');
+  return structuredClone(items);
+}
+async function changeDoorSnags(ctx,change){
+  return queueDoorSnagWrite(ctx.projectId+'/'+ctx.recordId,async()=>{
+    checkDoorSnagContext(ctx);
+    const path='/api/collections/schedule_records/records/'+encodeURIComponent(ctx.recordId);
+    let items;
+    if(ctx.cloud){
+      const fresh=await pbRequest(path,{cache:'no-store'});
+      if(String(fresh.project)!==String(ctx.projectId))throw new Error('The door no longer belongs to this project.');
+      items=readDoorSnagArray(fresh.snags_json);
+    }else items=readDoorSnagArray(doorSnagContextRecord(ctx)?.snagItems);
+    checkDoorSnagContext(ctx);
+    const updated=change(items);
+    if(ctx.cloud){
+      const saved=await pbRequest(path,{method:'PATCH',body:JSON.stringify({snags_json:JSON.stringify(updated)})});
+      items=readDoorSnagArray(saved.snags_json);
+      if(JSON.stringify(items)!==JSON.stringify(updated))throw new Error('The saved snag data could not be confirmed. Retry to check the record.');
+    }else items=updated;
+    // Apply only confirmed data to the captured project, even if navigation changed during PATCH.
+    const data=projectsData(),record=data.items[ctx.projectId]?.records?.find(r=>String(r.id)===String(ctx.recordId));
+    if(record){record.snagItems=items;saveProjectsData(data)}
+    return items;
+  });
+}
+function doorSnagContextRecord(ctx){return projectsData().items[ctx.projectId]?.records?.find(r=>String(r.id)===String(ctx.recordId))}
+async function refreshNativeDoorSnags(ctx){
+  if(projectsData().active!==ctx.projectId)return;
+  try{await renderCompletion();await searchProject()}catch(e){console.warn('Could not refresh snag display',e)}
+}
+async function saveNativeDoorSnag(draft,description){
+  if(draft.saved)return;
+  if(!description.trim())throw new Error('Enter a snag description.');
+  // Retain the same entry across retries, including an interrupted PATCH response.
+  if(!draft.item)draft.item={id:newId('snag'),item:'',description:description.trim(),location:draft.ctx.location,source:'Site report',status:'Outstanding',resolvedAt:''};
+  await changeDoorSnags(draft.ctx,items=>items.some(x=>x.id===draft.item.id)?items:[...items,draft.item]);
+  draft.saved=true;
+}
+async function submitNativeDoorSnag(draft,description,file){
+  if(draft.busy)return {busy:true};
+  draft.busy=true;
+  try{
+    await saveNativeDoorSnag(draft,description);
+    await refreshNativeDoorSnags(draft.ctx);
+    if(file){
+      try{
+        checkDoorSnagContext(draft.ctx);
+        if(draft.ctx.cloud)await uploadPbDoorPhoto(draft.ctx.projectId,draft.ctx.recordId,'Defect / snag',file);
+        else await addDoorPhotos(draft.ctx.recordId,[file],'Defect / snag');
+        await refreshNativeDoorSnags(draft.ctx);
+      }catch(e){return {photoError:'Snag saved. Photo was not confirmed: '+e.message+' Retry photo, or close to keep the snag without it.'}}
+    }
+    return {saved:true};
+  }finally{draft.busy=false}
+}
+function openNativeDoorSnag(projectId,recordId){
+  if(document.getElementById('nativeDoorSnagDialog'))return;
+  let ctx;try{ctx=doorSnagContext(projectId,recordId);checkDoorSnagContext(ctx)}catch(e){alert(e.message);return}
+  const draft={ctx,saved:false,busy:false},dialog=document.createElement('dialog');
+  dialog.id='nativeDoorSnagDialog';
+  dialog.className='native-door-snag-dialog';
+  dialog.setAttribute('aria-labelledby','nativeDoorSnagTitle');
+  dialog.innerHTML="<form><h2 id='nativeDoorSnagTitle'>Report snag</h2><p class='small' data-snag-context></p><label>Description<textarea name='description' required rows='4'></textarea></label><label>Photo (optional)<input name='photo' type='file' accept='image/*'></label><p class='small' role='status' aria-live='polite'></p><div class='customise'><button type='submit' class='btn primary'>Save snag</button><button type='button' class='btn' data-snag-close>Cancel</button></div></form>";
+  const form=dialog.querySelector('form'),description=form.elements.description,photo=form.elements.photo,status=dialog.querySelector('[role=status]'),submit=form.querySelector('[type=submit]'),close=form.querySelector('[data-snag-close]');
+  dialog.querySelector('[data-snag-context]').textContent=ctx.label;
+  const dismiss=()=>{if(!draft.busy){dialog.close();dialog.remove()}};
+  close.onclick=dismiss;dialog.addEventListener('cancel',e=>{e.preventDefault();dismiss()});
+  form.onsubmit=async e=>{
+    e.preventDefault();if(draft.busy)return;
+    submit.disabled=true;close.disabled=true;description.readOnly=true;photo.disabled=true;status.textContent=draft.saved?'Uploading photo…':'Saving snag…';
+    try{
+      const result=await submitNativeDoorSnag(draft,description.value,photo.files[0]);
+      if(result.photoError)status.textContent=result.photoError;
+      else{dismiss();return}
+    }catch(error){status.textContent='Could not save snag: '+error.message}
+    finally{
+      submit.disabled=false;close.disabled=false;photo.disabled=false;
+      description.readOnly=!!draft.item;
+      if(draft.saved){submit.textContent='Retry photo';close.textContent='Done'}
+    }
+  };
+  document.body.append(dialog);dialog.showModal();description.focus();
+}
+document.addEventListener('click',e=>{
+  const button=e.target.closest('.compact-report-snag');if(!button)return;
+  openNativeDoorSnag(button.dataset.snagProject,button.dataset.snagRecord);
+});
+async function setSnagResolved(recId,index,resolved){
+  const projectId=projectsData().active,ctx=doorSnagContext(projectId,recId);
+  const target=structuredClone(doorSnagContextRecord(ctx)?.snagItems?.[index]);if(!target)return;
+  await changeDoorSnags(ctx,items=>{
+    // Imported entries have no IDs: locate the unchanged entry, never a shifted array index.
+    const matches=items.map((x,i)=>({x,i})).filter(({x})=>target.id?x.id===target.id:JSON.stringify(x)===JSON.stringify(target));
+    if(matches.length!==1)throw new Error('This snag changed or is ambiguous. Refresh the door and try again.');
+    const i=matches[0].i;
+    items[i]={...items[i],status:resolved?'Resolved':'Outstanding',resolvedAt:resolved?new Date().toISOString():''};
+    return items;
+  });
+  await refreshNativeDoorSnags(ctx);
+}
+// End native door snags.
 
 function completionState(p,r){
   p.completion=p.completion||{};
@@ -1247,7 +1366,7 @@ function completionCard(r,p,docs=[]){
   let ratingBadge='';if(r.rating){let g=matchingGuide(docs,r.rating);ratingBadge=g?`<button type='button' class='status-chip fire guide-link guide-chip' data-guide='${esc(g.id)}'>${esc(r.rating)} <span class='guide-hint'>Guide ↗</span></button>`:`<span class='status-chip fire'>${esc(r.rating)}</span>`}
   let doorKey=completionDoorStateKey(p,r.id),doorOpen=completionDoorOpen.has(doorKey)?' open':'';
   const stage=(field,label,kind,photoLabel,primary=true)=>`<div class='compact-stage'><label class='compact-stage-check'><input type='checkbox' class='completion-check' data-rec='${esc(r.id)}' data-field='${field}' ${c[field]?'checked':''}><span><b>${label}</b><small>${fmtDate(c.dates?.[field])}</small></span></label><details class='compact-stage-tools'><summary>📷 Photo</summary><div class='compact-photo-tools'><select class='photo-kind' data-rec='${esc(r.id)}'><option>${photoLabel}</option><option>Other</option></select><label class='btn ${primary?'primary':''} compact-photo-btn'>Add<input class='door-photo-input' data-rec='${esc(r.id)}' type='file' accept='image/*' capture='environment' multiple style='display:none'></label></div><div class='photo-gallery' data-photo-gallery='${esc(r.id)}' data-photo-filter='${kind}'></div></details></div>`;
-  const snagHtml=snags.length?`<details class='compact-extra'><summary><b>Snags</b><span>${snagOpen} outstanding / ${snags.length} total</span></summary><div class='compact-extra-body'>${snags.map((x,i)=>`<label class='compact-snag'><input type='checkbox' class='snag-resolved' data-rec='${esc(r.id)}' data-snag='${i}' ${x.status==='Resolved'?'checked':''}><span><b>Item ${esc(x.item||'—')}</b> — ${esc(x.description||'')}<small>${esc(x.location||'')}${x.status==='Resolved'&&x.resolvedAt?' • resolved '+esc(fmtDate(x.resolvedAt)):''}</small></span></label>`).join('')}<div class='compact-photo-tools'><select class='photo-kind' data-rec='${esc(r.id)}'><option>Defect / snag</option><option>Other</option></select><label class='btn compact-photo-btn'>Add snag photo<input class='door-photo-input' data-rec='${esc(r.id)}' type='file' accept='image/*' capture='environment' multiple style='display:none'></label></div></div></details>`:`<div class='compact-empty-snag'><b>Snags</b><span>None</span><button type='button' class='btn compact-report-snag' title='Snag reporting workflow will be linked to project snag records'>Report snag</button></div>`;
+  const snagHtml=snags.length?`<details class='compact-extra'><summary><b>Snags</b><span>${snagOpen} outstanding / ${snags.length} total</span></summary><div class='compact-extra-body'><button type='button' class='btn compact-report-snag' data-snag-project='${esc(p.id)}' data-snag-record='${esc(r.id)}'>Report another snag</button>${snags.map((x,i)=>`<label class='compact-snag'><input type='checkbox' class='snag-resolved' data-rec='${esc(r.id)}' data-snag='${i}' ${x.status==='Resolved'?'checked':''}><span><b>Item ${esc(x.item||'—')}</b> — ${esc(x.description||'')}<small>${esc(x.location||'')}${x.status==='Resolved'&&x.resolvedAt?' • resolved '+esc(fmtDate(x.resolvedAt)):''}</small></span></label>`).join('')}<div class='compact-photo-tools'><select class='photo-kind' data-rec='${esc(r.id)}'><option>Defect / snag</option><option>Other</option></select><label class='btn compact-photo-btn'>Add snag photo<input class='door-photo-input' data-rec='${esc(r.id)}' type='file' accept='image/*' capture='environment' multiple style='display:none'></label></div></div></details>`:`<div class='compact-empty-snag'><b>Snags</b><span>None</span><button type='button' class='btn compact-report-snag' data-snag-project='${esc(p.id)}' data-snag-record='${esc(r.id)}'>Report snag</button></div>`;
   return `<details class='result completion-card compact-completion-card' data-completion-card='${esc(r.id)}'${doorOpen}><summary class='completion-door-summary'><div><div class='completion-door-title'><span class='completion-door-chevron'>›</span> ${esc(r.door||'No door ref')} — ${esc(r.room||r.roomNo||'Location not set')}</div><div class='completion-door-location'>${esc([r.floor,r.roomNo].filter(Boolean).join(' • ')||'')}</div></div><div class='completion-door-state'><span class='status-chip ${c.complete?'leaf':'missing'}'>${status}</span>${snagOpen?`<span class='status-chip missing'>${snagOpen} snag${snagOpen===1?'':'s'}</span>`:''}</div></summary><div class='completion-card-body compact-completion-body'><div class='compact-door-meta'>${ratingBadge}${r.ironSet?`<span class='status-chip set'>Set ${esc(r.ironSet)}</span>`:''}<span class='small'>${esc([r.floor,r.room,r.roomNo].filter(Boolean).join(' → '))}</span></div>${stage('frame','Frame fitted','frame','Frame fitted')}${stage('door','Door hung','door','Door fitted')}${stage('ironmongery','Ironmongery fitted','iron','Ironmongery fitted')}${Array.isArray(r.hardware)&&r.hardware.length?`<details class='compact-extra compact-hardware'><summary><b>Hardware</b><span>${r.hardware.length} items</span></summary>${completionHardwareHtml(r,docs)}</details>`:''}${snagHtml}<details class='compact-extra compact-notes'><summary><b>Notes</b><span>${c.note?'Added':'None'}</span></summary><label>Completion / inspector note<input class='completion-note' data-rec='${esc(r.id)}' value='${esc(c.note||'')}' placeholder='Snag reference, remedial work, inspector note…'></label></details><div class='small photo-count compact-photo-count' data-photo-count='${esc(r.id)}'>Photos: …</div><div class='photo-gallery' data-photo-gallery='${esc(r.id)}' data-photo-filter='other'></div></div></details>`
 }
 function normaliseCompletionSearch(v){return normaliseSearch(v).replace(/\b0+(\d+)\b/g,'$1')}

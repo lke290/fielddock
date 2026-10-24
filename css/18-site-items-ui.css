@@ -20,3 +20,13 @@
 .site-item-photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:8px;margin-top:10px}
 .site-item-photo-grid img{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:10px;cursor:pointer}
 @media(max-width:700px){#currentSiteListPanel .grid:has(#siteItemSearch){grid-template-columns:1fr!important}.site-item-more{margin-left:0}}
+/* Native door snag dialog */
+.native-door-snag-dialog{width:min(420px,calc(100vw - 32px));max-height:85dvh;overflow:auto;box-sizing:border-box;border:1px solid var(--line);border-radius:14px;padding:18px;background:var(--surface);color:var(--text)}
+.native-door-snag-dialog::backdrop{background:#0008}
+.native-door-snag-dialog h2{margin:0 0 10px}
+.native-door-snag-dialog label{display:block;margin:12px 0}
+.native-door-snag-dialog textarea{display:block;width:100%;box-sizing:border-box;padding:10px;border:1px solid var(--line);border-radius:9px;font:inherit;font-size:16px;resize:vertical}
+.native-door-snag-dialog input{max-width:100%}
+.native-door-snag-dialog p{overflow-wrap:anywhere}
+.native-door-snag-dialog .btn{min-height:44px}
+/* End native door snag dialog */
