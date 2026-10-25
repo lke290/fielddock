@@ -14,26 +14,27 @@ module.exports=async function dashboardShortcutRegressions(page){
     const names=tiles.map(t=>t.querySelector('b').textContent);
     const rects=tiles.map(t=>t.getBoundingClientRect());
     const balanced=rects.length===4&&rects.every(r=>r.width>0&&Math.abs(r.width-rects[0].width)<1&&Math.abs(r.height-rects[0].height)<1)&&Math.abs(rects[0].top-rects[1].top)<1&&Math.abs(rects[2].top-rects[3].top)<1&&rects[2].top>rects[0].top;
-    document.getElementById('dashSearchTile').click();
-    const searchFocused=document.activeElement.id==='pjSearch';
+    const mainSearchPreserved=document.getElementById('searchJobCard').querySelector('h2').textContent==='Search FieldDock'&&!document.getElementById('dashSearchTile');
+    const back=async()=>{await new Promise(resolve=>{window.addEventListener('popstate',resolve,{once:true});history.back()});return document.querySelector('.panel.active')?.id==='dashboard'};
     document.getElementById('pjSearch').value='D-TEST';await searchProject();
     const searchWorks=document.getElementById('pjSearchResults').textContent.includes('D-TEST');
     document.getElementById('pjSearch').value='';
-    document.getElementById('dashOutstandingTile').click();const outstanding=document.querySelector('.panel.active')?.id==='snags';
-    openTab('dashboard');document.getElementById('dashDiaryTile').click();const diary=document.querySelector('.panel.active')?.id==='calendar';
-    openTab('dashboard');document.getElementById('dashDrawingsTile').click();const drawings=document.querySelector('.panel.active')?.id==='drawings';
+    document.getElementById('dashOutstandingTile').click();const outstanding=document.querySelector('.panel.active')?.id==='snags'&&await back();
+    openTab('dashboard');document.getElementById('dashDiaryTile').click();const diary=document.querySelector('.panel.active')?.id==='calendar'&&await back();
+    openTab('dashboard');document.getElementById('dashDrawingsTile').click();const drawings=document.querySelector('.panel.active')?.id==='drawings'&&await back();
     openTab('dashboard');document.getElementById('dashCompletionTile').click();
     for(let i=0;i<40&&!document.getElementById('completionList').textContent.includes('D-TEST');i++)await new Promise(r=>setTimeout(r,5));
-    return {names,balanced,searchFocused,searchWorks,outstanding,diary,drawings,completion:calls===1&&document.querySelector('.panel.active')?.id==='completion'&&document.getElementById('completionListPanel').open&&document.getElementById('completionList').textContent.includes('D-TEST'),unique:document.querySelectorAll('#dashCompletionTile').length===1,noOrders:!document.querySelector("#orders,#dashMaterialsTile,[value='orders']")};
+    const completionWorks=calls===1&&document.querySelector('.panel.active')?.id==='completion'&&document.getElementById('completionListPanel').open&&document.getElementById('completionList').textContent.includes('D-TEST');
+    const completionBack=await back();
+    return {names,balanced,mainSearchPreserved,searchWorks,completionBack,drawingsInGrid:document.getElementById('dashDrawingsTile').parentElement.classList.contains('dashboard-tile-grid'),monochromeDoor:!!document.querySelector("#dashCompletionTile svg[stroke='currentColor']"),outstanding,diary,drawings,completion:completionWorks,unique:document.querySelectorAll('#dashCompletionTile').length===1,noOrders:!document.querySelector("#orders,#dashMaterialsTile,[value='orders']")};
    }finally{
     pbAuth=prior.auth;pbRequest=prior.request;pbSharedGuidance=prior.shared;photosFor=prior.photos;pbMemberships=prior.members;renderCompletion=prior.completion;
     if(prior.projects===null)localStorage.removeItem(PROJECTS_KEY);else localStorage.setItem(PROJECTS_KEY,prior.projects);
     document.getElementById('pjSearch').value='';
    }
   },role);
-  assert.deepEqual(result.names,['Search This Job','Outstanding Works','Door Completion','Site Diary']);
+  assert.deepEqual(result.names,['Outstanding Works','Door Completion','Project Drawings','Site Diary']);
   for(const [name,ok] of Object.entries(result))if(name!=='names')assert(ok,role+': '+name);
-  await page.goBack();await page.waitForFunction(()=>document.querySelector('.panel.active')?.id==='dashboard');
  }
- console.log('PASS: four equal dashboard tiles in 2x2 order; existing completion action and Back; search, outstanding, diary and drawings actions for Joiner/Supervisor/Admin.');
+ console.log('PASS: four equal dashboard tiles in 2x2 order; existing actions and Back from all four; main search preserved for Joiner/Supervisor/Admin.');
 };
