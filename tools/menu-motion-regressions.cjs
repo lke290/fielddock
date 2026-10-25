@@ -6,7 +6,7 @@ module.exports=async function menuMotionRegressions(page){
   document.getElementById('loginScreen').classList.add('hidden');
   saveProjectsData({active:'menu-fixture',items:{'menu-fixture':{id:'menu-fixture',name:'Menu fixture',records:[],docs:[],siteItems:[],diaryEvents:[]}}});
  });
- const picker=async id=>page.evaluate(id=>{const el=document.getElementById(id),s=getComputedStyle(el,'::picker(select)');return {open:el.matches(':open'),opacity:Number(s.opacity),display:s.display,duration:s.transitionDuration,transform:s.transform}},id);
+ const picker=async id=>page.evaluate(id=>{const el=document.getElementById(id),s=getComputedStyle(el,'::picker(select)'),m=s.transform==='none'?new DOMMatrixReadOnly():new DOMMatrixReadOnly(s.transform);return {open:el.matches(':open'),opacity:Number(s.opacity),display:s.display,duration:s.transitionDuration,scaleX:m.a,scaleY:m.d,translateX:m.e,translateY:m.f,origin:s.transformOrigin,easing:s.transitionTimingFunction}},id);
  try{
   const supported=await page.evaluate(()=>CSS.supports('appearance','base-select')&&CSS.supports('transition-behavior','allow-discrete'));
   assert(supported,'Installed Chromium must exercise the enhanced select picker');
@@ -28,10 +28,13 @@ module.exports=async function menuMotionRegressions(page){
    await page.evaluate(theme=>document.documentElement.dataset.theme=theme,theme);
    for(const id of ['listMenu','siteMenu']){
     await page.locator('#'+id).click();await page.waitForTimeout(75);
-    const opening=await picker(id);assert(opening.open&&opening.opacity>0&&opening.opacity<1,'Opening has an intermediate fade: '+JSON.stringify(opening));assert(opening.duration.split(',').every(x=>x.trim()==='0.18s'));
+    const opening=await picker(id);assert(opening.open&&opening.opacity>0&&opening.opacity<1,'Opening has an intermediate fade: '+JSON.stringify(opening));assert(opening.duration.split(',').every(x=>x.trim()==='0.2s'));
+    assert(opening.scaleX>.96&&opening.scaleX<1&&opening.scaleY>.94&&opening.scaleY<1&&opening.translateX===0&&opening.translateY===0,'Opening expands without sliding');
+    assert.equal(opening.origin.split(' ')[1],'0px');assert(opening.easing.includes('cubic-bezier(0.2, 0.75, 0.25, 1)'));
     await page.waitForTimeout(160);assert.equal((await picker(id)).opacity,1);
     await page.keyboard.press('Escape');await page.waitForTimeout(65);
     const closing=await picker(id);assert(!closing.open&&closing.opacity>0&&closing.opacity<1&&closing.display!=='none','Closing remains visible during transition: '+JSON.stringify(closing));
+    assert(closing.scaleX>.96&&closing.scaleX<1&&closing.scaleY>.94&&closing.scaleY<1&&closing.translateX===0&&closing.translateY===0,'Closing shrinks without sliding');
     await page.waitForTimeout(160);assert.equal((await picker(id)).display,'none');
    }
   }
@@ -39,11 +42,13 @@ module.exports=async function menuMotionRegressions(page){
   await page.locator('#listMenu').click();assert((await picker('listMenu')).open&&!(await picker('siteMenu')).open,'Site replaces Tools');await page.keyboard.press('Escape');
   for(const id of ['listMenu','siteMenu']){
    for(let i=0;i<8;i++)await page.locator('#'+id).click();
-   await page.keyboard.press('Escape');await page.waitForTimeout(210);const state=await picker(id);assert(!state.open&&state.display==='none','Rapid taps settle closed');
+   await page.keyboard.press('Escape');
+   await page.waitForFunction(id=>{const el=document.getElementById(id);return !el.matches(':open')&&getComputedStyle(el,'::picker(select)').display==='none'},id,{timeout:1500});
+   const state=await picker(id);assert(!state.open&&state.display==='none','Rapid taps settle closed');
   }
   await page.emulateMedia({reducedMotion:'reduce'});
   for(const id of ['listMenu','siteMenu']){
-   await page.locator('#'+id).click();const state=await picker(id);assert(state.open&&state.opacity===1&&state.duration.split(',').every(x=>x.trim()==='0s'),'Reduced motion opens instantly');
+   await page.locator('#'+id).click();const state=await picker(id);assert(state.open&&state.opacity===1&&state.scaleX===1&&state.scaleY===1&&state.duration.split(',').every(x=>x.trim()==='0s'),'Reduced motion opens instantly');
    await page.keyboard.press('Escape');assert.equal((await picker(id)).display,'none');
   }
   await page.emulateMedia({reducedMotion:'no-preference'});

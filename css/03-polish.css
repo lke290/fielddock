@@ -55,12 +55,12 @@ button.calendar-event.delivery{border-left:3px solid var(--accent)}
   #listMenu::picker-icon,#siteMenu::picker-icon{content:'';float:right;width:5px;height:5px;margin:calc(-.5em - 8.5px) -17px 0 0;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg)}
   #listMenu::picker(select),#siteMenu::picker(select){
     background:var(--surface);color:var(--text);border:1px solid var(--line);border-radius:10px;
-    box-shadow:0 14px 32px rgba(0,0,0,.16);opacity:0;transform:translateY(-4px);
-    transition:opacity 180ms cubic-bezier(.2,.7,.2,1),transform 180ms cubic-bezier(.2,.7,.2,1),display 180ms allow-discrete,overlay 180ms allow-discrete;
+    box-shadow:0 14px 32px rgba(0,0,0,.16);opacity:0;transform-origin:50% 0;transform:scale(.96,.94);
+    transition:opacity 200ms cubic-bezier(.2,.75,.25,1),transform 200ms cubic-bezier(.2,.75,.25,1),display 200ms allow-discrete,overlay 200ms allow-discrete;
   }
-  #listMenu:open::picker(select),#siteMenu:open::picker(select){opacity:1;transform:translateY(0)}
+  #listMenu:open::picker(select),#siteMenu:open::picker(select){opacity:1;transform:scale(1)}
   @starting-style {
-    #listMenu:open::picker(select),#siteMenu:open::picker(select){opacity:0;transform:translateY(-4px)}
+    #listMenu:open::picker(select),#siteMenu:open::picker(select){opacity:0;transform:scale(.96,.94)}
   }
   @media(prefers-reduced-motion:reduce){
     #listMenu::picker(select),#siteMenu::picker(select){transition-duration:0s;transform:none}
