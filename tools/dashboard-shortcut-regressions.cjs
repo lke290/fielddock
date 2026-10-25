@@ -33,7 +33,7 @@ module.exports=async function dashboardShortcutRegressions(page){
     document.getElementById('pjSearch').value='';
    }
   },role);
-  assert.deepEqual(result.names,['Outstanding Works','Door Completion','Project Drawings','Site Diary']);
+  assert.deepEqual(result.names,['Outstanding Works','Site Diary','Project Drawings','Door Completion']);
   for(const [name,ok] of Object.entries(result))if(name!=='names')assert(ok,role+': '+name);
  }
  console.log('PASS: four equal dashboard tiles in 2x2 order; existing actions and Back from all four; main search preserved for Joiner/Supervisor/Admin.');
