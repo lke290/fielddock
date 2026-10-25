@@ -66,12 +66,13 @@ let compared=restoreDashboardShortcuts(restoreOrdersUI(restoreCalendarUI(rebuilt
 // Permit only the exact upload-container selector correction.
 assert.equal(compared.split("inp.closest('.photo-tools, .compact-photo-tools')").length,2);
 compared=compared.replace("inp.closest('.photo-tools, .compact-photo-tools')","inp.closest('.photo-tools')");
-for(const [start,end] of [['function mapPbPhoto(', 'function pbPhotoKind('],['const photoRefreshRequests=', 'function bindPhotoControls('],['// Native door snags:', 'function completionState('],['function completionCard(', 'async function renderCompletion('],["async function ensurePbAuth(","window.addEventListener('storage'"]]){
- const baselineStart=start==='// Native door snags:'?'async function setSnagResolved(':start==='const photoRefreshRequests='?'async function refreshPhotoUI(':start;
+for(const [start,end] of [['function mapPbCompletion(', 'const IRON_ITEMS='],['function canEditCompletionStage(', 'function fmtDate('],['function mapPbPhoto(', 'function pbPhotoKind('],['const photoRefreshRequests=', 'function bindPhotoControls('],['// Native door snags:', 'function completionState('],['function completionCard(', 'async function renderCompletion('],["async function ensurePbAuth(","window.addEventListener('storage'"]]){
+ const baselineStart=start==='function canEditCompletionStage('?'async function saveCompletion(':start==='// Native door snags:'?'async function setSnagResolved(':start==='const photoRefreshRequests='?'async function refreshPhotoUI(':start;
  const a=compared.indexOf(start),b=compared.indexOf(end,a);
  assert(a>=0&&b>a);
  compared=compared.slice(0,a)+original.slice(original.indexOf(baselineStart),original.indexOf(end,original.indexOf(baselineStart)))+compared.slice(b);
 }
+compared=compared.replace("async()=>{const wanted=x.checked;x.disabled=true;await saveCompletion(x.dataset.rec,x.dataset.field,wanted)}","()=>saveCompletion(x.dataset.rec,x.dataset.field,x.checked)");
 compared=compared.replace("Photos: …</div><div class='photo-gallery' data-photo-gallery='${esc(r.id)}' data-photo-filter='other'></div>","Photos: …</div>");
 assert.equal(compared,original,'Only reviewed photo, native door snag and session error-handling functions may differ');
 for(const file of ['config.js','manifest.json','sw.js','icon-192.png','icon-512.png'])assert.equal(cp.execFileSync('git',['hash-object',file],{cwd:root}).toString().trim(),cp.execFileSync('git',['rev-parse',meta.revision+':'+file],{cwd:root}).toString().trim());

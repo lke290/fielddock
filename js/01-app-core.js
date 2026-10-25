@@ -1162,6 +1162,7 @@ $('loadRoundhay').addEventListener('click',()=>{if(confirm('Reload the Roundhay 
 function mapPbCompletion(r){
   return {
     _pbId:r.id,
+    owners:{frame:r.frame_completed_by||'',door:r.door_completed_by||'',ironmongery:r.ironmongery_completed_by||''},
     frame:!!r.frame_fitted,door:!!r.door_hung,
     installComplete:!!r.installation_complete,
     ironmongery:!!r.ironmongery_fitted,snags:!!r.snags_cleared,
@@ -1182,8 +1183,11 @@ async function pbCompletionRecords(projectId){
   return data.items||[];
 }
 async function syncPocketBaseCompletion(projectId){
-  const d=projectsData(),p=d.items[projectId];if(!p||!p._pocketbase)return;
-  const rows=await pbCompletionRecords(projectId);p.completion={};
+  if(!projectsData().items[projectId]?._pocketbase)return;
+  const token=pbAuth()?.token,rows=await pbCompletionRecords(projectId);
+  if(pbAuth()?.token!==token)return;
+  const d=projectsData(),p=d.items[projectId];if(!p)return;
+  p.completion={};
   for(const row of rows){const rid=row.schedule_record;if(rid)p.completion[rid]=mapPbCompletion(row)}
   saveProjectsData(d);
 }
@@ -1201,14 +1205,13 @@ function completionPayload(c,projectId,recId){
     note:c.note||''
   };
 }
-async function savePbCompletion(projectId,recId,c){
-  const body=JSON.stringify(completionPayload(c,projectId,recId));
-  if(c._pbId){
-    const row=await pbRequest('/api/collections/completion_records/records/'+encodeURIComponent(c._pbId),{method:'PATCH',body});
-    return mapPbCompletion(row);
-  }
-  const row=await pbRequest('/api/collections/completion_records/records',{method:'POST',body});
-  return mapPbCompletion(row);
+async function savePbCompletion(projectId,recId,c,field){
+  const stageFields={frame:['frame_fitted','frame_fitted_at'],door:['door_hung','door_hung_at'],ironmongery:['ironmongery_fitted','ironmongery_fitted_at']};
+  const fields=stageFields[field];
+  const payload=fields?{[fields[0]]:!!c[field],[fields[1]]:c[field]?c.dates[field]:''}:{note:c.note||''};
+  if(!c._pbId){payload.project=projectId;payload.schedule_record=recId}
+  const path='/api/collections/completion_records/records'+(c._pbId?'/'+encodeURIComponent(c._pbId):'');
+  return mapPbCompletion(await pbRequest(path,{method:c._pbId?'PATCH':'POST',body:JSON.stringify(payload)}));
 }
 
 const IRON_ITEMS=['Grade 13 Butt Hinge','Hinge Intumescent','Lever on Rose','Escutcheon','Bathroom Turn & Indicator','Pull Handle','Finger Plate','Borg 5003F Digital Lock','DIN Intumescent','DIN Escape','DIN Bathroom','DIN Sashlock','Cylinder & Turn 70mm','Flush Bolt','Socket','Swing Free/Hold Open Closer','Door Closer','Signage FDKS','Signage AFDKC','Signage FDKL','Door Stop Floor Mounted','Kick Plate 900 x 150mm SS','Kick Plate 450 x 150mm SS','76mm SSS Numeral','Wall Magnet By Others'];
@@ -1447,39 +1450,41 @@ function completionState(p,r){
   p.completion=p.completion||{};
   return p.completion[r.id]||{frame:false,door:false,installComplete:false,ironmongery:false,snags:false,ironComplete:false,complete:false,dates:{},note:''}
 }
+function canEditCompletionStage(p,c,field){
+  if(!p?._pocketbase)return true;
+  const user=pbAuth()?.record;
+  if(!user?.id)return false;
+  if(['admin','supervisor'].includes(authRole()))return true;
+  return !c[field] || (typeof c.owners?.[field]==='string' && c.owners[field]===user.id);
+}
 async function saveCompletion(recId,field,value){
-  let d=projectsData(),p=d.items[d.active];if(!p)return;
-  p.completion=p.completion||{};let c=completionState(p,{id:recId});
-  c[field]=value;c.dates=c.dates||{};
-  if(typeof value==='boolean')c.dates[field]=value?new Date().toISOString():'';
-
-  // v4.9.46: stage completion follows site order of operation.
-  // Legacy PocketBase section-complete fields are retained for compatibility,
-  // but are derived rather than presented as extra manual checkboxes.
-  const wasInstall=!!c.installComplete, wasIron=!!c.ironComplete;
-  c.installComplete=!!(c.frame&&c.door);
-  c.ironComplete=!!c.ironmongery;
-  if(c.installComplete&&!wasInstall)c.dates.installComplete=new Date().toISOString();
-  if(!c.installComplete)c.dates.installComplete='';
-  if(c.ironComplete&&!wasIron)c.dates.ironComplete=new Date().toISOString();
-  if(!c.ironComplete)c.dates.ironComplete='';
-  c.complete=!!(c.frame&&c.door&&c.ironmongery);
-  if(c.complete&&!c.dates.complete)c.dates.complete=new Date().toISOString();
-  if(!c.complete)c.dates.complete='';
-
-  p.completion[recId]=c;saveProjectsData(d);renderCompletion();renderTeam();renderDashboard();renderProjectCards();
+  const projectId=projectsData().active,p=activeProject(),token=pbAuth()?.token;if(!p)return;
+  if(!['frame','door','ironmongery','note'].includes(field))return;
   try{
-    if(p._pocketbase){
-      const saved=await savePbCompletion(d.active,recId,c);
-      p.completion[recId]=saved;saveProjectsData(d);
+    // Re-read cloud state before mutation; the server independently enforces it.
+    if(p._pocketbase)await syncPocketBaseCompletion(projectId);
+    if(projectsData().active!==projectId||pbAuth()?.token!==token)return;
+    const d=projectsData(),project=d.items[projectId],c=structuredClone(completionState(project,{id:recId}));
+    if(field!=='note'&&!canEditCompletionStage(project,c,field))throw Error('Only the person who completed this stage can change it.');
+    c[field]=value;c.dates=c.dates||{};
+    if(typeof value==='boolean')c.dates[field]=value?new Date().toISOString():'';
+    if(project._pocketbase){
+      const saved=await savePbCompletion(projectId,recId,c,field);
+      // Re-read local project data to avoid saving over another project's state.
+      const latest=projectsData();if(pbAuth()?.token===token&&latest.items[projectId]){latest.items[projectId].completion[recId]=saved;addAudit(latest.items[projectId],'Updated completion',recId,field+' = '+String(value));saveProjectsData(latest)}
+    }else{
+      c.installComplete=!!(c.frame&&c.door);c.ironComplete=!!c.ironmongery;c.complete=!!(c.frame&&c.door&&c.ironmongery);
+      for(const k of ['installComplete','ironComplete','complete'])c.dates[k]=c[k]?(c.dates[k]||new Date().toISOString()):'';
+      project.completion[recId]=c;addAudit(project,'Updated completion',recId,field+' = '+String(value));saveProjectsData(d);
     }
-    addAudit(p,'Updated completion',recId,field+' = '+String(value));saveProjectsData(d);
   }catch(err){
     console.error(err);
-    alert('Completion was changed on this device but could not be saved to PocketBase: '+err.message);
+    if(p._pocketbase&&pbAuth()?.token===token)try{await syncPocketBaseCompletion(projectId)}catch(refreshError){console.warn('Could not refresh completion',refreshError)}
+    alert('Could not save completion: '+err.message);
   }
-  renderCompletion();renderTeam();renderDashboard();renderProjectCards();
+  if(projectsData().active===projectId){renderCompletion();renderTeam();renderDashboard();renderProjectCards()}
 }
+
 function fmtDate(v){if(!v)return '—';try{return new Date(v).toLocaleDateString()}catch(e){return v}}
 function syncFixedChromeHeights(){const top=document.querySelector('.top'),tabs=document.querySelector('.tabs');if(top)document.documentElement.style.setProperty('--jr-top-h',Math.ceil(top.getBoundingClientRect().height)+'px');if(tabs)document.documentElement.style.setProperty('--jr-nav-h',Math.ceil(tabs.getBoundingClientRect().height)+'px')}
 window.addEventListener('resize',syncFixedChromeHeights);window.addEventListener('load',()=>{syncFixedChromeHeights();setTimeout(syncFixedChromeHeights,100)});
@@ -1495,14 +1500,14 @@ function completionCard(r,p,docs=[]){
   let snags=Array.isArray(r.snagItems)?r.snagItems:[],snagOpen=snags.filter(x=>x.status!=='Resolved').length;
   let ratingBadge='';if(r.rating){let g=matchingGuide(docs,r.rating);ratingBadge=g?`<button type='button' class='status-chip fire guide-link guide-chip' data-guide='${esc(g.id)}'>${esc(r.rating)} <span class='guide-hint'>Guide ↗</span></button>`:`<span class='status-chip fire'>${esc(r.rating)}</span>`}
   let doorKey=completionDoorStateKey(p,r.id),doorOpen=completionDoorOpen.has(doorKey)?' open':'';
-  const stage=(field,label,kind,photoLabel,primary=true)=>`<div class='compact-stage'><label class='compact-stage-check'><input type='checkbox' class='completion-check' data-rec='${esc(r.id)}' data-field='${field}' ${c[field]?'checked':''}><span><b>${label}</b><small>${fmtDate(c.dates?.[field])}</small></span></label><details class='compact-stage-tools'><summary>📷 Photo</summary><div class='compact-photo-tools'><select class='photo-kind' data-rec='${esc(r.id)}'><option>${photoLabel}</option><option>Other</option></select><label class='btn ${primary?'primary':''} compact-photo-btn'>Add<input class='door-photo-input' data-rec='${esc(r.id)}' type='file' accept='image/*' capture='environment' multiple style='display:none'></label></div><div class='photo-gallery' data-photo-gallery='${esc(r.id)}' data-photo-filter='${kind}'></div></details></div>`;
+  const stage=(field,label,kind,photoLabel,primary=true)=>`<div class='compact-stage'><label class='compact-stage-check'><input type='checkbox' class='completion-check' data-rec='${esc(r.id)}' data-field='${field}' ${c[field]?'checked':''} ${canEditCompletionStage(p,c,field)?'':"disabled title='Only the completing user or a supervisor can change this stage'"}><span><b>${label}</b><small>${fmtDate(c.dates?.[field])}</small></span></label><details class='compact-stage-tools'><summary>📷 Photo</summary><div class='compact-photo-tools'><select class='photo-kind' data-rec='${esc(r.id)}'><option>${photoLabel}</option><option>Other</option></select><label class='btn ${primary?'primary':''} compact-photo-btn'>Add<input class='door-photo-input' data-rec='${esc(r.id)}' type='file' accept='image/*' capture='environment' multiple style='display:none'></label></div><div class='photo-gallery' data-photo-gallery='${esc(r.id)}' data-photo-filter='${kind}'></div></details></div>`;
   const snagGallery=`<div class='door-snag-photos' data-snag-photos hidden><b class='small'>Snag photos</b><div class='photo-gallery' data-photo-gallery='${esc(r.id)}' data-photo-filter='snag'></div></div>`;
   const snagHtml=snags.length?`<details class='compact-extra'><summary><b>Snags</b><span>${snagOpen} outstanding / ${snags.length} total</span></summary><div class='compact-extra-body'><button type='button' class='btn compact-report-snag' data-snag-project='${esc(p.id)}' data-snag-record='${esc(r.id)}'>Report another snag</button>${snags.map((x,i)=>`<label class='compact-snag'><input type='checkbox' class='snag-resolved' data-rec='${esc(r.id)}' data-snag='${i}' ${x.status==='Resolved'?'checked':''}><span><b>Item ${esc(x.item||'—')}</b> — ${esc(x.description||'')}<small>${esc(x.location||'')}${x.status==='Resolved'&&x.resolvedAt?' • resolved '+esc(fmtDate(x.resolvedAt)):''}</small></span></label>`).join('')}<div class='compact-photo-tools'><select class='photo-kind' data-rec='${esc(r.id)}'><option>Defect / snag</option><option>Other</option></select><label class='btn compact-photo-btn'>Add snag photo<input class='door-photo-input' data-rec='${esc(r.id)}' type='file' accept='image/*' capture='environment' multiple style='display:none'></label></div>${snagGallery}</div></details>`:`<div class='compact-empty-snag'><b>Snags</b><span>None</span><button type='button' class='btn compact-report-snag' data-snag-project='${esc(p.id)}' data-snag-record='${esc(r.id)}'>Report snag</button>${snagGallery}</div>`;
   return `<details class='result completion-card compact-completion-card' data-completion-card='${esc(r.id)}'${doorOpen}><summary class='completion-door-summary'><div><div class='completion-door-title'><span class='completion-door-chevron'>›</span> ${esc(r.door||'No door ref')} — ${esc(r.room||r.roomNo||'Location not set')}</div><div class='completion-door-location'>${esc([r.floor,r.roomNo].filter(Boolean).join(' • ')||'')}</div></div><div class='completion-door-state'><span class='status-chip ${c.complete?'leaf':'missing'}'>${status}</span>${snagOpen?`<span class='status-chip missing'>${snagOpen} snag${snagOpen===1?'':'s'}</span>`:''}</div></summary><div class='completion-card-body compact-completion-body'><div class='compact-door-meta'>${ratingBadge}${r.ironSet?`<span class='status-chip set'>Set ${esc(r.ironSet)}</span>`:''}<span class='small'>${esc([r.floor,r.room,r.roomNo].filter(Boolean).join(' → '))}</span></div>${stage('frame','Frame fitted','frame','Frame fitted')}${stage('door','Door hung','door','Door fitted')}${stage('ironmongery','Ironmongery fitted','iron','Ironmongery fitted')}${Array.isArray(r.hardware)&&r.hardware.length?`<details class='compact-extra compact-hardware'><summary><b>Hardware</b><span>${r.hardware.length} items</span></summary>${completionHardwareHtml(r,docs)}</details>`:''}${snagHtml}<details class='compact-extra compact-notes'><summary><b>Notes</b><span>${c.note?'Added':'None'}</span></summary><label>Completion / inspector note<input class='completion-note' data-rec='${esc(r.id)}' value='${esc(c.note||'')}' placeholder='Snag reference, remedial work, inspector note…'></label></details><div class='small photo-count compact-photo-count' data-photo-count='${esc(r.id)}'>Photos: …</div><div class='photo-gallery' data-photo-gallery='${esc(r.id)}' data-photo-filter='other'></div></div></details>`
 }
 function normaliseCompletionSearch(v){return normaliseSearch(v).replace(/\b0+(\d+)\b/g,'$1')}
 let completionGlobalFilter=null;
-async function renderCompletion(){let p=activeProject(),el=$('completionList'),sum=$('completionSummary');if(!el)return;if(!p){el.innerHTML='<p class="small">Select a project first.</p>';if(sum)sum.innerHTML='';return}let q=normaliseCompletionSearch($('completionSearch')?.value||''),rows=(p.records||[]).filter(r=>{if(completionGlobalFilter?.ids&&!completionGlobalFilter.ids.has(String(r.id)))return false;let c=completionState(p,r),t=normaliseCompletionSearch(recText(r)+' '+(c.complete?'complete':'incomplete')+' '+(c.note||''));return !q||q.split(/\s+/).every(x=>t.includes(x))});let total=(p.records||[]).length,done=(p.records||[]).filter(r=>completionState(p,r).complete).length,docs=await projectRequirementGuides();if(sum)sum.innerHTML=`<div class='grid'><div class='result'><b>${done}</b><br><span class='small'>complete</span></div><div class='result'><b>${total-done}</b><br><span class='small'>outstanding</span></div><div class='result'><b>${total}</b><br><span class='small'>total doors</span></div></div>`;el.innerHTML=(completionGlobalFilter?`<div class='completion-filter-banner'><span>Showing <b>${rows.length}</b> result${rows.length===1?'':'s'} for “${esc(completionGlobalFilter.label)}”</span><button type='button' class='btn' id='clearCompletionGlobalFilter'>Clear</button></div>`:'')+(rows.length?rows.map(r=>completionCard(r,p,docs)).join(''):'<p class="small">No matching doors.</p>');$('clearCompletionGlobalFilter')?.addEventListener('click',()=>{completionGlobalFilter=null;renderCompletion()});bindCompletionDoorState(el,p);bindPhotoControls(el);bindGuideLinks(el,docs);el.querySelectorAll('.completion-check').forEach(x=>x.addEventListener('change',()=>saveCompletion(x.dataset.rec,x.dataset.field,x.checked)));el.querySelectorAll('.snag-resolved').forEach(x=>x.addEventListener('change',async()=>{let wanted=x.checked;x.disabled=true;try{await setSnagResolved(x.dataset.rec,+x.dataset.snag,wanted)}catch(e){x.checked=!wanted;alert('Could not save snag status: '+e.message)}finally{x.disabled=false}}));el.querySelectorAll('.completion-note').forEach(x=>x.addEventListener('change',()=>saveCompletion(x.dataset.rec,'note',x.value)))}
+async function renderCompletion(){let p=activeProject(),el=$('completionList'),sum=$('completionSummary');if(!el)return;if(!p){el.innerHTML='<p class="small">Select a project first.</p>';if(sum)sum.innerHTML='';return}let q=normaliseCompletionSearch($('completionSearch')?.value||''),rows=(p.records||[]).filter(r=>{if(completionGlobalFilter?.ids&&!completionGlobalFilter.ids.has(String(r.id)))return false;let c=completionState(p,r),t=normaliseCompletionSearch(recText(r)+' '+(c.complete?'complete':'incomplete')+' '+(c.note||''));return !q||q.split(/\s+/).every(x=>t.includes(x))});let total=(p.records||[]).length,done=(p.records||[]).filter(r=>completionState(p,r).complete).length,docs=await projectRequirementGuides();if(sum)sum.innerHTML=`<div class='grid'><div class='result'><b>${done}</b><br><span class='small'>complete</span></div><div class='result'><b>${total-done}</b><br><span class='small'>outstanding</span></div><div class='result'><b>${total}</b><br><span class='small'>total doors</span></div></div>`;el.innerHTML=(completionGlobalFilter?`<div class='completion-filter-banner'><span>Showing <b>${rows.length}</b> result${rows.length===1?'':'s'} for “${esc(completionGlobalFilter.label)}”</span><button type='button' class='btn' id='clearCompletionGlobalFilter'>Clear</button></div>`:'')+(rows.length?rows.map(r=>completionCard(r,p,docs)).join(''):'<p class="small">No matching doors.</p>');$('clearCompletionGlobalFilter')?.addEventListener('click',()=>{completionGlobalFilter=null;renderCompletion()});bindCompletionDoorState(el,p);bindPhotoControls(el);bindGuideLinks(el,docs);el.querySelectorAll('.completion-check').forEach(x=>x.addEventListener('change',async()=>{const wanted=x.checked;x.disabled=true;await saveCompletion(x.dataset.rec,x.dataset.field,wanted)}));el.querySelectorAll('.snag-resolved').forEach(x=>x.addEventListener('change',async()=>{let wanted=x.checked;x.disabled=true;try{await setSnagResolved(x.dataset.rec,+x.dataset.snag,wanted)}catch(e){x.checked=!wanted;alert('Could not save snag status: '+e.message)}finally{x.disabled=false}}));el.querySelectorAll('.completion-note').forEach(x=>x.addEventListener('change',()=>saveCompletion(x.dataset.rec,'note',x.value)))}
 $('completionSearch')?.addEventListener('input',renderCompletion);$('completionRefresh')?.addEventListener('click',renderCompletion);
 function closeGlobalSearchAfterSelection(){let input=$('pjSearch'),box=$('pjSearchResults');if(input)input.value='';if(box){box.innerHTML='';box.hidden=true}}
 document.addEventListener('click',async e=>{let b=e.target.closest('[data-completion-rec]');if(!b)return;if(b.closest('#pjSearchResults'))closeGlobalSearchAfterSelection();openTab('completion');let panel=$('completionListPanel');if(panel)panel.open=true;if($('completionSearch'))$('completionSearch').value='';let p=activeProject();if(p?._pocketbase){try{await syncPocketBaseSchedules(p.id)}catch(err){console.warn('Could not refresh schedule hardware before opening completion record',err)}}if(p){completionDoorOpen.add(completionDoorStateKey(p,b.dataset.completionRec));saveCompletionDoorOpen()}await renderCompletion();setTimeout(()=>document.querySelector(`[data-completion-card="${CSS.escape(b.dataset.completionRec)}"]`)?.scrollIntoView({behavior:'smooth',block:'start'}),50)});

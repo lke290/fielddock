@@ -1,5 +1,5 @@
 const fs=require('node:fs'),path=require('node:path'),http=require('node:http'),assert=require('node:assert/strict');
-const {chromium}=require('C:/Users/LukeP/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const {chromium}=require(process.env.FIELDDOCK_PLAYWRIGHT||path.join(process.env.USERPROFILE,'.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright'));
 const root=path.resolve(__dirname,'..');
 const server=http.createServer((req,res)=>{
  let file=decodeURIComponent(new URL(req.url,'http://localhost').pathname).replace(/^\/(?:fielddock\/)?/,'');
@@ -59,6 +59,7 @@ const server=http.createServer((req,res)=>{
      await require('./photo-session-regressions.cjs')(page);
      await require('./snag-regressions.cjs')(page);
      await require('./completion-interaction-regressions.cjs')(page);
+     await require('./completion-ownership-regressions.cjs')(page);
     }
     assert.deepEqual(errors,[],`${route} workflow runtime errors`);
     assert.deepEqual(ordersRequests,[],`${route} unnecessary Orders requests`);
