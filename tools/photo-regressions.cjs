@@ -17,9 +17,10 @@ module.exports=async function photoRegressions(page){
    {id:'snake',kind:'door_fitted',file:'snake.jpg'}
   ];
   const mapped=fixtures.map(r=>mapPbPhoto({...r,project:'project',schedule_record:'door-id'}));
-  const oldProjects=projectsData,oldPhotos=photosFor;
+  const oldProjects=projectsData,oldPhotos=photosFor,oldAuth=pbAuth;
   const host=document.createElement('div');document.body.append(host);
   try{
+   pbAuth=()=>({record:{id:'owner',role:'admin'}});
    projectsData=()=>({active:'project',items:{project:{id:'project'}}});
    photosFor=async()=>mapped;
    host.innerHTML=completionCard({id:'door-id',door:'D-1',snagItems:[{description:'Test snag'}]},{id:'project'},[]);
@@ -37,11 +38,25 @@ module.exports=async function photoRegressions(page){
    const count=host.querySelector('[data-photo-count]').textContent;
    // Existing controls still exist on every rendered image.
    const controls=[host.querySelectorAll('.photo-item').length,host.querySelectorAll('.photo-item button').length];
-   return {sections,count,controls,visible,urls:mapped.map(p=>p.url),kinds:mapped.map(p=>p.kind)};
-  }finally{projectsData=oldProjects;photosFor=oldPhotos;host.remove()}
+   const permissions=[];
+   for(const role of ['admin','supervisor','joiner','user','']){
+    for(const owner of ['owner','someone-else',undefined]){
+     pbAuth=()=>({record:{id:'owner',role}});
+     photosFor=async()=>fixtures.map(p=>mapPbPhoto({...p,uploaded_by:owner}));
+     await refreshPhotoUI('door-id');
+     const allowed=['admin','supervisor'].includes(role)||owner==='owner';
+     const galleries=[...host.querySelectorAll('[data-photo-gallery]')];
+     permissions.push(galleries.every(g=>g.querySelectorAll('button').length===(allowed?g.querySelectorAll('img').length:0)));
+    }
+   }
+   pbAuth=()=>null;
+   permissions.push(!canDeletePhoto(mapped[0]),canDeletePhoto({blob:new Blob()}));
+   return {sections,count,controls,visible,permissions,urls:mapped.map(p=>p.url),kinds:mapped.map(p=>p.kind)};
+  }finally{projectsData=oldProjects;photosFor=oldPhotos;pbAuth=oldAuth;host.remove()}
  });
  assert.deepEqual(result.sections,{frame:['frame','caption'],door:['door','legacy','snake'],iron:['iron','legacy-kind'],snag:['snag'],other:['other','empty','group','installation']});
  assert.equal(result.count,'Photos: 12');assert.deepEqual(result.controls,[12,12]);
+ assert(result.permissions.every(Boolean),'All evidence galleries must enforce role and uploader visibility, including missing uploader/auth');
  assert.equal(result.visible,true,'All fixture images decode and are visible when photo sections are open');
  assert(result.urls.every(u=>/\/api\/files\/door_photos\//.test(u)));
  console.log('PASS: actual door card renders all 12 current/legacy photo fixtures exactly once in the expected sections, with count and delete controls.');

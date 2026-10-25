@@ -485,10 +485,17 @@ function mapPbPhoto(r){
     if(r.photo)urls.push(pbFileUrl('door_photos',r.id,r.photo));
     if(r.file&&r.file!==r.photo)urls.push(pbFileUrl('door_photos',r.id,r.file));
   }
-  return {id:r.id,projectId:r.project,recordId:r.schedule_record,group:derivedGroup,
+  return {id:r.id,projectId:r.project,recordId:r.schedule_record,group:derivedGroup,uploaded_by:r.uploaded_by,
     kind:displayKind,name:r.original_name||filename||'Site photo',
     type:r.mime_type||'',created:r.created||'',file:filename,_pocketbase:true,
     url:urls[0]||'',urls:[...new Set(urls)]};
+}
+function canDeletePhoto(photo){
+  // Local IndexedDB photos retain their existing delete behaviour.
+  if(!photo._pocketbase)return true;
+  const user=pbAuth()?.record;
+  if(!user?.id)return false;
+  return ['admin','supervisor'].includes(authRole())||photo.uploaded_by===user.id;
 }
 function pbPhotoKind(kind){
   const k=String(kind||'').toLowerCase();
@@ -602,8 +609,12 @@ async function refreshPhotoUI(recordId){
       img.addEventListener('error',()=>{candidateIndex++;if(candidateIndex<candidates.length){img.src=candidates[candidateIndex]}else{img.classList.add('photo-load-error');img.alt='Photo could not be displayed'}});
       img.addEventListener('click',()=>window.open(img.src,'_blank'));
       let meta=document.createElement('div');meta.className='photo-meta';meta.innerHTML=`<b>${esc(p.kind||'Photo')}</b><br>${esc(p.created?new Date(p.created).toLocaleString():'Site photo')}`;
-      let del=document.createElement('button');del.className='small danger';del.textContent='Delete';del.addEventListener('click',async()=>{if(!confirm('Delete this photo?'))return;try{await deleteDoorPhoto(p.id,recordId)}catch(e){alert('Could not delete photo: '+e.message)}});
-      item.append(img,meta,del);g.appendChild(item)
+      item.append(img,meta);
+      if(canDeletePhoto(p)){
+        let del=document.createElement('button');del.className='small danger';del.textContent='Delete';del.addEventListener('click',async()=>{if(!confirm('Delete this photo?'))return;try{await deleteDoorPhoto(p.id,recordId)}catch(e){alert('Could not delete photo: '+e.message)}});
+        item.appendChild(del);
+      }
+      g.appendChild(item)
     }
   })
 }
