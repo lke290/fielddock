@@ -46,3 +46,24 @@ button.calendar-event.delivery{border-left:3px solid var(--accent)}
 #calendarSelectedDay{margin-top:16px;padding:12px;border:1px solid var(--line);border-radius:12px}
 #calendarSelectedDay[hidden],.calendar-add-event[hidden]{display:none!important}
 /* End interactive project Calendar */
+
+/* Site and Tools picker motion only */
+@supports (appearance:base-select) and (transition-behavior:allow-discrete) {
+  #listMenu,#siteMenu,#listMenu::picker(select),#siteMenu::picker(select){appearance:base-select}
+  /* Preserve native closed-control metrics and the existing right-aligned chevron. */
+  #listMenu,#siteMenu{line-height:calc(1em + 9px)}
+  #listMenu::picker-icon,#siteMenu::picker-icon{content:'';float:right;width:5px;height:5px;margin:calc(-.5em - 8.5px) -17px 0 0;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg)}
+  #listMenu::picker(select),#siteMenu::picker(select){
+    background:var(--surface);color:var(--text);border:1px solid var(--line);border-radius:10px;
+    box-shadow:0 14px 32px rgba(0,0,0,.16);opacity:0;transform:translateY(-4px);
+    transition:opacity 180ms cubic-bezier(.2,.7,.2,1),transform 180ms cubic-bezier(.2,.7,.2,1),display 180ms allow-discrete,overlay 180ms allow-discrete;
+  }
+  #listMenu:open::picker(select),#siteMenu:open::picker(select){opacity:1;transform:translateY(0)}
+  @starting-style {
+    #listMenu:open::picker(select),#siteMenu:open::picker(select){opacity:0;transform:translateY(-4px)}
+  }
+  @media(prefers-reduced-motion:reduce){
+    #listMenu::picker(select),#siteMenu::picker(select){transition-duration:0s;transform:none}
+  }
+}
+/* End Site and Tools picker motion */

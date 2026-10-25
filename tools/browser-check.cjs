@@ -41,15 +41,17 @@ const server=http.createServer((req,res)=>{
      fieldStyles.forEach(([id,style])=>{if(style!==null)document.getElementById(id)?.setAttribute('style',style)});
      const sheet=document.createElement('style');sheet.textContent=styles;document.head.append(sheet);applyPermissionsUI();
     },{markup:fs.readFileSync(path.join(root,'index.html'),'utf8').match(/<section id='calendar'[\s\S]*?<\/section>/)[0],styles:fs.readFileSync(path.join(root,'css/03-polish.css'),'utf8').match(/\/\* Interactive project Calendar \*\/[\s\S]*?\/\* End interactive project Calendar \*\//)[0]});
+    // Picker option presentation differs by renderer; contents and behaviour have dedicated coverage.
     const state=await page.evaluate(()=>({
      globals:['openTab','applyAuth','pbFetch','completionHardwareHtml','renderSiteItems'].map(k=>[k,typeof window[k]]),
-     elements:[...document.body.querySelectorAll('*')].filter(e=>!['SCRIPT','STYLE','LINK'].includes(e.tagName)).map(e=>{
+     elements:[...document.body.querySelectorAll('*')].filter(e=>!['SCRIPT','STYLE','LINK'].includes(e.tagName)&&!(e.tagName==='OPTION'&&e.closest('#listMenu,#siteMenu'))).map(e=>{
       const s=getComputedStyle(e);return [e.tagName,e.id,e.className,e.textContent,s.display,s.color,s.backgroundColor,s.fontSize,s.padding,s.margin,s.position,s.width,s.height];
      })
     }));
     assert.deepEqual(errors,[],`${route} runtime errors`);assert.deepEqual(missing,[],`${route} missing resources`);
     snapshots.push(state);
     if(route!=='/baseline.html'){
+     await require('./menu-motion-regressions.cjs')(page);
      await require('./dashboard-shortcut-regressions.cjs')(page);
      await require('./orders-ui-regressions.cjs')(page);
      await require('./calendar-regressions.cjs')(page);

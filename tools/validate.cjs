@@ -62,7 +62,7 @@ function restoreCalendarUI(source){
 }
 
 // Only reviewed photo, native door snag and session error-handling changes may differ.
-let compared=restoreDashboardShortcuts(restoreOrdersUI(restoreCalendarUI(rebuilt))).replace(/\/\* Native door snag dialog \*\/[\s\S]*?\/\* End native door snag dialog \*\/\n?/,'');
+let compared=restoreDashboardShortcuts(restoreOrdersUI(restoreCalendarUI(rebuilt))).replace(/\n\/\* Site and Tools picker motion only \*\/[\s\S]*?\/\* End Site and Tools picker motion \*\/\n/,'').replace(/\/\* Native door snag dialog \*\/[\s\S]*?\/\* End native door snag dialog \*\/\n?/,'');
 // Permit only the exact upload-container selector correction.
 assert.equal(compared.split("inp.closest('.photo-tools, .compact-photo-tools')").length,2);
 compared=compared.replace("inp.closest('.photo-tools, .compact-photo-tools')","inp.closest('.photo-tools')");
