@@ -19,9 +19,12 @@ const server=http.createServer((req,res)=>{
    for(const route of ['/baseline.html','/','/fielddock/']){
     const context=await browser.newContext({viewport:{width,height:900},hasTouch:width===390,serviceWorkers:'block'});
     await context.route('**/*',r=>new URL(r.request().url()).origin===origin?r.continue():r.abort());
-    const page=await context.newPage(),errors=[],missing=[];
+    const page=await context.newPage(),errors=[],missing=[],ordersRequests=[];
+    page.on('request',r=>{if(/\/collections\/orders(?:\/|\?)/.test(r.url()))ordersRequests.push(r.url())});
     page.on('pageerror',e=>errors.push(e.message));page.on('response',r=>{if(r.status()>=400)missing.push(r.url())});
     await page.goto(origin+route);await page.waitForTimeout(300);
+    // Normalize the intentionally removed Orders UI in the frozen baseline only.
+    if(route==='/baseline.html')await page.evaluate(()=>document.querySelectorAll("#orders,#dashMaterialsTile,#dashboardSiteOrders,option[value='orders']").forEach(el=>{const next=el.nextSibling;if(next?.nodeType===Node.TEXT_NODE&&next.textContent.startsWith('\n'))next.textContent=next.textContent.slice(1);el.remove()}));
     const state=await page.evaluate(()=>({
      globals:['openTab','applyAuth','pbFetch','completionHardwareHtml','renderSiteItems'].map(k=>[k,typeof window[k]]),
      elements:[...document.body.querySelectorAll('*')].filter(e=>!['SCRIPT','STYLE','LINK'].includes(e.tagName)).map(e=>{
@@ -31,12 +34,14 @@ const server=http.createServer((req,res)=>{
     assert.deepEqual(errors,[],`${route} runtime errors`);assert.deepEqual(missing,[],`${route} missing resources`);
     snapshots.push(state);
     if(route!=='/baseline.html'){
+     await require('./orders-ui-regressions.cjs')(page);
      await require('./photo-regressions.cjs')(page);
      await require('./photo-session-regressions.cjs')(page);
      await require('./snag-regressions.cjs')(page);
      await require('./completion-interaction-regressions.cjs')(page);
     }
     assert.deepEqual(errors,[],`${route} workflow runtime errors`);
+    assert.deepEqual(ordersRequests,[],`${route} unnecessary Orders requests`);
     await context.close();
    }
    assert.deepEqual(snapshots[1],snapshots[0],`root DOM/styles/globals at ${width}`);

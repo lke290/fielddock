@@ -15,8 +15,35 @@ for(const asset of meta.assets){
   rebuilt=rebuilt.replace(`<link${asset.attributes} rel="stylesheet" href="${asset.file}">`,()=>`<style${asset.attributes}>${body}</style>`);
  }
 }
+// Restore only the reviewed Orders UI regions for the frozen extraction comparison.
+// Behaviour is checked separately by orders-ui-regressions.cjs.
+function restoreOrdersUI(source){
+ const referenceLines=original.split('\n');
+ const prefixes=["$('listMenu').addEventListener",'function renderDashboard(){','function openTab(id){','function refreshProjectSelect(){','async function saveSiteItems(items){','function projectCounts(){',"byId('dashOutstandingTile')",'let items=siteItemsForProject().filter(x=>', 'const itemHtml=items.length<=8?', "groups.push({title:'Notes", "box.querySelectorAll('[data-site-result]')", "box.querySelector('[data-site-group]')"];
+ let lines=source.split('\n');
+ for(const prefix of prefixes){
+  const old=referenceLines.find(line=>line.trimStart().startsWith(prefix));
+  const index=lines.findIndex(line=>line.trimStart().startsWith(prefix));
+  assert(old!==undefined&&index>=0,`Orders comparison region: ${prefix}`);
+  lines[index]=old;
+ }
+ source=lines.join('\n');
+ const start=original.indexOf('function siteOrderStatusLabel('),end=original.indexOf('let calendarCursor=',start);
+ source=source.replace('let calendarCursor=',original.slice(start,end)+'let calendarCursor=');
+ source=source.replace("<option value='calendar'>Calendar</option>","<option value='orders'>Orders</option><option value='calendar'>Calendar</option>");
+ const panel=original.match(/<section id='orders' class='panel'>[\s\S]*?<\/section>\n/)[0];
+ source=source.replace("<section id='calendar'",panel+"<section id='calendar'");
+ const tile=referenceLines.find(line=>line.includes("id='dashMaterialsTile'"));
+ source=source.replace("<button type='button' class='dashboard-nav-tile' id='dashDiaryTile'",tile+"\n<button type='button' class='dashboard-nav-tile' id='dashDiaryTile'");
+ source=source.replace("<div id='dashboardSiteItems' hidden></div>","<div id='dashboardSiteItems' hidden></div><div id='dashboardSiteOrders' hidden></div>");
+ const cssStart=original.indexOf('/* v4.15.7 — Orders mobile form polish. */'),cssEnd=original.indexOf('</style>',cssStart);
+ source=source.replace(/(<style id='v4963-polish'>[\s\S]*?)(<\/style>)/,(_,body,end)=>body+'\n'+original.slice(cssStart,cssEnd)+end);
+ return source;
+}
+assert(!html.includes("value='orders'")&&!html.includes("id='orders'")&&!html.includes("id='dashMaterialsTile'"),'Orders entry points must be removed');
+
 // Only reviewed photo, native door snag and session error-handling changes may differ.
-let compared=rebuilt.replace(/\/\* Native door snag dialog \*\/[\s\S]*?\/\* End native door snag dialog \*\/\n?/,'');
+let compared=restoreOrdersUI(rebuilt).replace(/\/\* Native door snag dialog \*\/[\s\S]*?\/\* End native door snag dialog \*\/\n?/,'');
 // Permit only the exact upload-container selector correction.
 assert.equal(compared.split("inp.closest('.photo-tools, .compact-photo-tools')").length,2);
 compared=compared.replace("inp.closest('.photo-tools, .compact-photo-tools')","inp.closest('.photo-tools')");
@@ -40,6 +67,6 @@ for(const icon of manifest.icons)assert(fs.existsSync(path.join(root,icon.src)))
 const prior=fs.readFileSync(path.join(root,'tools/auth-regressions.cjs'),'utf8');
 const testRequire=name=>name==='node:fs'?{...fs,readFileSync:(f,...args)=>f===path.join(root,'index.html')||f===root+'/index.html'?rebuilt:fs.readFileSync(f,...args)}:require(name);
 vm.runInNewContext(prior,{require:testRequire,__dirname:root,console,Headers,FormData,process},{filename:'auth-regressions.cjs'});
-console.log('PASS: 7 scripts parse; baseline unchanged outside reviewed photo/native snag/session functions; supporting files, local references, CSS paths, manifest icons and service worker syntax.');
+console.log('PASS: 7 scripts parse; baseline unchanged outside reviewed photo/native snag/session/Orders UI regions; supporting files, local references, CSS paths, manifest icons and service worker syntax.');
 
 

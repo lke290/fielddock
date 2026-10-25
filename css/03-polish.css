@@ -35,8 +35,3 @@ html:not([data-theme='dark']) #sharedGuidancePanel > summary.collapsible-header,
 html:not([data-theme='dark']) #regulationReferencesPanel > summary.collapsible-header{
  background:linear-gradient(100deg,#ece7e4 0%,#ead9ce 52%,#e7c2a8 100%)!important;
 }
-
-/* v4.15.7 — Orders mobile form polish. */
-.site-order-notes-label{display:block;margin-top:12px}
-.site-order-notes-label textarea{display:block;width:100%;box-sizing:border-box;min-height:130px;margin-top:6px;padding:14px 16px;border-radius:12px;line-height:1.45;font-size:16px;resize:vertical;overflow:auto}
-@media(max-width:700px){.site-order-notes-label textarea{min-height:145px}}
