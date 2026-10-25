@@ -6,9 +6,15 @@ module.exports=async function menuMotionRegressions(page){
   document.getElementById('loginScreen').classList.add('hidden');
   saveProjectsData({active:'menu-fixture',items:{'menu-fixture':{id:'menu-fixture',name:'Menu fixture',records:[],docs:[],siteItems:[],diaryEvents:[]}}});
  });
- const picker=async id=>page.evaluate(id=>{const el=document.getElementById(id),s=getComputedStyle(el,'::picker(select)'),m=s.transform==='none'?new DOMMatrixReadOnly():new DOMMatrixReadOnly(s.transform);return {open:el.matches(':open'),opacity:Number(s.opacity),display:s.display,duration:s.transitionDuration,scaleX:m.a,scaleY:m.d,translateX:m.e,translateY:m.f,origin:s.transformOrigin,easing:s.transitionTimingFunction}},id);
+ const picker=async id=>page.evaluate(id=>{
+  const el=document.getElementById(id),s=getComputedStyle(el,'::picker(select)'),m=s.transform==='none'?new DOMMatrixReadOnly():new DOMMatrixReadOnly(s.transform);
+  const inset=s.clipPath.match(/^inset\((.*?)(?:\s+round\s+.*?)?\)$/),parts=inset?inset[1].match(/calc\([^)]*\)|[^\s]+/g):[];
+  return {open:el.matches(':open'),opacity:Number(s.opacity),display:s.display,duration:s.transitionDuration,scaleX:m.a,scaleY:m.d,translateX:m.e,translateY:m.f,clipTop:parts[0],clipRight:parts[1]||parts[0],clipBottom:parts[2]||parts[0],clipLeft:parts[3]||parts[1]||parts[0],easing:s.transitionTimingFunction};
+ },id);
+ const fixedEdges=state=>state.clipTop==='-48px'&&state.clipRight==='-48px'&&state.clipLeft==='-48px'&&state.scaleX===1&&state.scaleY===1&&state.translateX===0&&state.translateY===0;
+
  try{
-  const supported=await page.evaluate(()=>CSS.supports('appearance','base-select')&&CSS.supports('transition-behavior','allow-discrete'));
+  const supported=await page.evaluate(()=>CSS.supports('appearance','base-select')&&CSS.supports('transition-behavior','allow-discrete')&&CSS.supports('clip-path','inset(0)'));
   assert(supported,'Installed Chromium must exercise the enhanced select picker');
   for(const role of ['admin','supervisor','joiner']){
    await page.evaluate(role=>{pbAuth=()=>({record:{id:'menu-user',role}});pbMemberships=[{project:'menu-fixture',user:'menu-user',role:'joiner'}];applyPermissionsUI();openTab('dashboard')},role);
@@ -28,14 +34,15 @@ module.exports=async function menuMotionRegressions(page){
    await page.evaluate(theme=>document.documentElement.dataset.theme=theme,theme);
    for(const id of ['listMenu','siteMenu']){
     await page.locator('#'+id).click();await page.waitForTimeout(75);
-    const opening=await picker(id);assert(opening.open&&opening.opacity>0&&opening.opacity<1,'Opening has an intermediate fade: '+JSON.stringify(opening));assert(opening.duration.split(',').every(x=>x.trim()==='0.2s'));
-    assert(opening.scaleX>.96&&opening.scaleX<1&&opening.scaleY>.94&&opening.scaleY<1&&opening.translateX===0&&opening.translateY===0,'Opening expands without sliding');
-    assert.equal(opening.origin.split(' ')[1],'0px');assert(opening.easing.includes('cubic-bezier(0.2, 0.75, 0.25, 1)'));
-    await page.waitForTimeout(160);assert.equal((await picker(id)).opacity,1);
+    const opening=await picker(id);assert(opening.open&&opening.opacity>=.85&&opening.opacity<=1,'Opening uses only a slight fade: '+JSON.stringify(opening));
+    assert.deepEqual(opening.duration.split(',').map(x=>x.trim()),['0.12s','0.22s','0.22s','0.22s']);
+    assert(fixedEdges(opening)&&opening.clipBottom!=='-48px'&&opening.clipBottom!=='88%','Only the bottom reveal edge moves: '+JSON.stringify(opening));
+    assert(opening.easing.includes('cubic-bezier(0.25, 0.15, 0.25, 1)'));
+    await page.waitForTimeout(180);const opened=await picker(id);assert.equal(opened.opacity,1);assert.equal(opened.clipBottom,'-48px');
     await page.keyboard.press('Escape');await page.waitForTimeout(65);
-    const closing=await picker(id);assert(!closing.open&&closing.opacity>0&&closing.opacity<1&&closing.display!=='none','Closing remains visible during transition: '+JSON.stringify(closing));
-    assert(closing.scaleX>.96&&closing.scaleX<1&&closing.scaleY>.94&&closing.scaleY<1&&closing.translateX===0&&closing.translateY===0,'Closing shrinks without sliding');
-    await page.waitForTimeout(160);assert.equal((await picker(id)).display,'none');
+    const closing=await picker(id);assert(!closing.open&&closing.opacity>=.85&&closing.opacity<=1&&closing.display!=='none','Closing remains visible during reveal reversal: '+JSON.stringify(closing));
+    assert(fixedEdges(closing)&&closing.clipBottom!=='-48px'&&closing.clipBottom!=='88%','Closing clips upward without scaling or sliding: '+JSON.stringify(closing));
+    await page.waitForFunction(id=>getComputedStyle(document.getElementById(id),'::picker(select)').display==='none',id,{timeout:1500});
    }
   }
   await page.locator('#listMenu').click();await page.locator('#siteMenu').click();assert(!(await picker('listMenu')).open&&(await picker('siteMenu')).open,'Tools replaces Site');
@@ -48,7 +55,7 @@ module.exports=async function menuMotionRegressions(page){
   }
   await page.emulateMedia({reducedMotion:'reduce'});
   for(const id of ['listMenu','siteMenu']){
-   await page.locator('#'+id).click();const state=await picker(id);assert(state.open&&state.opacity===1&&state.scaleX===1&&state.scaleY===1&&state.duration.split(',').every(x=>x.trim()==='0s'),'Reduced motion opens instantly');
+   await page.locator('#'+id).click();const state=await picker(id);assert(state.open&&state.opacity===1&&fixedEdges(state)&&state.clipBottom==='-48px'&&state.duration.split(',').every(x=>x.trim()==='0s'),'Reduced motion opens instantly');
    await page.keyboard.press('Escape');assert.equal((await picker(id)).display,'none');
   }
   await page.emulateMedia({reducedMotion:'no-preference'});
