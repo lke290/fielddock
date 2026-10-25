@@ -34,6 +34,13 @@ const server=http.createServer((req,res)=>{
      oldLink.remove();oldGrid.outerHTML=markup;
      document.getElementById('dashOutstandingMeta').textContent=outstanding;document.getElementById('dashDiaryMeta').textContent=diary;
     },fs.readFileSync(path.join(root,'index.html'),'utf8').match(/<div class='dashboard-tile-grid'[\s\S]*?(?=<button type='button' class='dashboard-wide-link supervisor-only-ui')/)[0].trimEnd());
+    // The Calendar has its own interaction coverage; normalize its reviewed markup here.
+    if(route==='/baseline.html')await page.evaluate(({markup,styles})=>{
+     const fieldStyles=[...document.querySelectorAll('#calendar [id]')].map(el=>[el.id,el.getAttribute('style')]);
+     document.getElementById('calendar').outerHTML=markup;
+     fieldStyles.forEach(([id,style])=>{if(style!==null)document.getElementById(id)?.setAttribute('style',style)});
+     const sheet=document.createElement('style');sheet.textContent=styles;document.head.append(sheet);applyPermissionsUI();
+    },{markup:fs.readFileSync(path.join(root,'index.html'),'utf8').match(/<section id='calendar'[\s\S]*?<\/section>/)[0],styles:fs.readFileSync(path.join(root,'css/03-polish.css'),'utf8').match(/\/\* Interactive project Calendar \*\/[\s\S]*?\/\* End interactive project Calendar \*\//)[0]});
     const state=await page.evaluate(()=>({
      globals:['openTab','applyAuth','pbFetch','completionHardwareHtml','renderSiteItems'].map(k=>[k,typeof window[k]]),
      elements:[...document.body.querySelectorAll('*')].filter(e=>!['SCRIPT','STYLE','LINK'].includes(e.tagName)).map(e=>{
@@ -45,6 +52,7 @@ const server=http.createServer((req,res)=>{
     if(route!=='/baseline.html'){
      await require('./dashboard-shortcut-regressions.cjs')(page);
      await require('./orders-ui-regressions.cjs')(page);
+     await require('./calendar-regressions.cjs')(page);
      await require('./photo-regressions.cjs')(page);
      await require('./photo-session-regressions.cjs')(page);
      await require('./snag-regressions.cjs')(page);

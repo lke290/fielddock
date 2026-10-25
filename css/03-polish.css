@@ -35,3 +35,14 @@ html:not([data-theme='dark']) #sharedGuidancePanel > summary.collapsible-header,
 html:not([data-theme='dark']) #regulationReferencesPanel > summary.collapsible-header{
  background:linear-gradient(100deg,#ece7e4 0%,#ead9ce 52%,#e7c2a8 100%)!important;
 }
+
+/* Interactive project Calendar */
+.calendar-day-select{border:0;background:transparent;color:inherit;padding:4px;min-width:28px;min-height:28px;text-align:left;cursor:pointer}
+.calendar-day-select[aria-pressed='true']{color:var(--accent);outline:1px solid var(--accent);border-radius:6px}
+button.calendar-event{width:100%;text-align:left;border:0;color:inherit;cursor:pointer}
+button.calendar-event.delivery{border-left:3px solid var(--accent)}
+.calendar-day-select:focus-visible,button.calendar-event:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.calendar-event-notes{white-space:pre-wrap;overflow-wrap:anywhere;margin-top:4px}
+#calendarSelectedDay{margin-top:16px;padding:12px;border:1px solid var(--line);border-radius:12px}
+#calendarSelectedDay[hidden],.calendar-add-event[hidden]{display:none!important}
+/* End interactive project Calendar */

@@ -49,8 +49,20 @@ function restoreDashboardShortcuts(source){
  return source.replace(/^ byId\('dashSearchTile'\)[^\n]*\n/m,'');
 }
 
+// Restore only the reviewed Calendar UI, persistence and refresh integration.
+function restoreCalendarUI(source){
+ const region=(text,start,end)=>text.slice(text.indexOf(start),text.indexOf(end,text.indexOf(start)));
+ source=source.replace(/let calendarCursor=[\s\S]*?(?=function renderDashboardDiary\(\))/,()=>region(original,'let calendarCursor=','function renderDashboardDiary()'));
+ source=source.replace(/\$\('diaryCancel'\)[\s\S]*?(?=\$\('calendarPrev'\))/,()=>region(original,"$('diaryAdd')","$('calendarPrev')"));
+ source=source.replace("  renderSiteDiary();\n  if(document.querySelector('#calendar.panel.active'))refreshSiteDiary();\n",'');
+ const permission=original.split('\n').find(line=>line.includes("const manage=canManageProject();document.querySelectorAll('.calendar-add-event')"));
+ source=source.replace(/^  const manage=canManageProject\(\);document.querySelectorAll\('\.calendar-add-event'\)[^\n]*/m,()=>permission);
+ source=source.replace(/<section id='calendar'[\s\S]*?<\/section>/,()=>original.match(/<section id='calendar'[\s\S]*?<\/section>/)[0]);
+ return source.replace(/\n\/\* Interactive project Calendar \*\/[\s\S]*?\/\* End interactive project Calendar \*\/\n/,'');
+}
+
 // Only reviewed photo, native door snag and session error-handling changes may differ.
-let compared=restoreDashboardShortcuts(restoreOrdersUI(rebuilt)).replace(/\/\* Native door snag dialog \*\/[\s\S]*?\/\* End native door snag dialog \*\/\n?/,'');
+let compared=restoreDashboardShortcuts(restoreOrdersUI(restoreCalendarUI(rebuilt))).replace(/\/\* Native door snag dialog \*\/[\s\S]*?\/\* End native door snag dialog \*\/\n?/,'');
 // Permit only the exact upload-container selector correction.
 assert.equal(compared.split("inp.closest('.photo-tools, .compact-photo-tools')").length,2);
 compared=compared.replace("inp.closest('.photo-tools, .compact-photo-tools')","inp.closest('.photo-tools')");
@@ -74,6 +86,6 @@ for(const icon of manifest.icons)assert(fs.existsSync(path.join(root,icon.src)))
 const prior=fs.readFileSync(path.join(root,'tools/auth-regressions.cjs'),'utf8');
 const testRequire=name=>name==='node:fs'?{...fs,readFileSync:(f,...args)=>f===path.join(root,'index.html')||f===root+'/index.html'?rebuilt:fs.readFileSync(f,...args)}:require(name);
 vm.runInNewContext(prior,{require:testRequire,__dirname:root,console,Headers,FormData,process},{filename:'auth-regressions.cjs'});
-console.log('PASS: 7 scripts parse; baseline unchanged outside reviewed photo/native snag/session/Orders UI regions; supporting files, local references, CSS paths, manifest icons and service worker syntax.');
+console.log('PASS: 7 scripts parse; baseline unchanged outside reviewed photo/native snag/session/Orders/dashboard/Calendar regions; supporting files, local references, CSS paths, manifest icons and service worker syntax.');
 
 

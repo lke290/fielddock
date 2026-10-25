@@ -175,7 +175,7 @@ async function renderAdminAccountDirectory(){
   }catch(e){list.innerHTML=`<p class='small'>Could not load accounts: ${esc(e.message)}</p>`}
 }
 function renderDashboard(){let p=activeProject(),el=$('dashboardProject'),st=$('dashboardStats');if(!el)return;if(!p){el.innerHTML=`<div class='result'><div class='result-title'><b>No project open</b></div><div class='small'>Select a project to load the dashboard.</div></div>`;if(st)st.innerHTML='';if($('pjSearchResults'))$('pjSearchResults').innerHTML="<p class='small'>No project open. Use Switch / manage projects to select a job.</p>";if($('dashboardSiteItems'))$('dashboardSiteItems').innerHTML="<p class='small'>No project open.</p>";if($('dashboardDrawings'))$('dashboardDrawings').innerHTML="<p class='small'>No project open.</p>";if($('dashboardDiary'))$('dashboardDiary').innerHTML="<p class='small'>No current project.</p>";return}ensureProjectV3(p);let recs=p.records||[],docs=p.docs||[],rated=recs.filter(r=>r.rating&&r.rating!=='-').length,linked=recs.filter(r=>r.iron&&r.iron!=='-').length,done=recs.filter(r=>completionState(p,r).complete).length;el.innerHTML=`<div class='result'><div class='result-title'><b>${esc(p.name||'Untitled project')}</b></div><div class='small'><b>${esc(p.contractor||'No contractor')}</b>${p.client?' • '+esc(p.client):''} • ${recs.length} doors${p.revision?' • Issue '+esc(p.revision):''}</div></div>`;if(st)st.innerHTML=`<div class='grid'><div class='result'><b>${recs.length}</b><br><span class='small'>schedule records</span></div><div class='result'><b>${linked}</b><br><span class='small'>linked ironmongery</span></div><div class='result'><b>${rated}</b><br><span class='small'>rated doors</span></div><div class='result'><b>${docs.length}</b><br><span class='small'>registered documents</span></div></div>`;renderDashboardSiteItems();renderDashboardDiary()}
-function openTab(id){if(id==='orders')id='dashboard';document.getElementById('headerMenuPanel')?.classList.remove('open');document.getElementById('headerMenuBtn')?.setAttribute('aria-expanded','false');document.getElementById('accountPanel')?.classList.remove('open');document.getElementById('appearancePanel')?.classList.remove('open');document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('active',x.dataset.tab===id));$('listMenu')?.classList.toggle('nav-active',['notes','snags','calendar'].includes(id));$('siteMenu')?.classList.toggle('nav-active',['convert','formula','regs'].includes(id));document.querySelectorAll('.panel').forEach(x=>x.classList.toggle('active',x.id===id));if(id==='regs'){if(typeof renderProjectRequirements==='function')renderProjectRequirements();if(typeof renderSharedGuidance==='function')renderSharedGuidance();}if(id==='notes'){renderSiteNotes().catch(e=>console.warn('Notes render failed',e));}if(id==='snags'){renderSiteItems();}if(id==='calendar'){renderSiteDiary();}}
+function openTab(id){if(id==='orders')id='dashboard';document.getElementById('headerMenuPanel')?.classList.remove('open');document.getElementById('headerMenuBtn')?.setAttribute('aria-expanded','false');document.getElementById('accountPanel')?.classList.remove('open');document.getElementById('appearancePanel')?.classList.remove('open');document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('active',x.dataset.tab===id));$('listMenu')?.classList.toggle('nav-active',['notes','snags','calendar'].includes(id));$('siteMenu')?.classList.toggle('nav-active',['convert','formula','regs'].includes(id));document.querySelectorAll('.panel').forEach(x=>x.classList.toggle('active',x.id===id));if(id==='regs'){if(typeof renderProjectRequirements==='function')renderProjectRequirements();if(typeof renderSharedGuidance==='function')renderSharedGuidance();}if(id==='notes'){renderSiteNotes().catch(e=>console.warn('Notes render failed',e));}if(id==='snags'){renderSiteItems();}if(id==='calendar'){refreshSiteDiary();}}
 
 let projectArchiveView='active';
 function deletionTimeLeft(p){
@@ -279,6 +279,8 @@ async function switchActiveProject(id,goDashboard=false){
   try{await renderSiteItems()}catch(e){console.warn(e)}
   try{await renderCompletion()}catch(e){console.warn(e)}
   renderDashboard();renderTeam();renderProjectCards();updateScheduleTarget();
+  renderSiteDiary();
+  if(document.querySelector('#calendar.panel.active'))refreshSiteDiary();
   if(goDashboard)openTab('dashboard');
 }
 function refreshProjectSelect(){let d=projectsData(),sel=$('projectSelect');sel.innerHTML="<option value=''>Select project…</option>"+Object.entries(d.items).filter(([id,p])=>canUseProject(id)&&(!p.pendingDelete&&(!p.archived||id===d.active))).map(([id,p])=>`<option value='${esc(id)}'>${esc(p.name||'Untitled')} — ${esc(p.contractor||'No contractor')}</option>`).join('');sel.value=d.active||'';loadProjectEditor();renderProjectRecords();renderDocs();searchProject();renderDashboard();renderCompletion();renderTeam();renderProjectCards();renderSiteItems();updateScheduleTarget();applyPermissionsUI()}
@@ -400,13 +402,127 @@ $('siteNoteSave')?.addEventListener('click',async()=>{try{await saveCurrentSiteN
 $('siteItemSearch')?.addEventListener('input',renderSiteItems);$('siteItemFilter')?.addEventListener('change',renderSiteItems);$('siteItemFloorFilter')?.addEventListener('change',renderSiteItems);$('siteItemListFilter')?.addEventListener('change',renderSiteItems);
 function siteOrdersForProject(){return siteItemsForProject().filter(x=>x&&x.orderType)}
 let calendarCursor=new Date();
+let calendarSelectedDate='',calendarEditor=null,calendarScope='',calendarReadVersion=0,calendarSaving=false;
+function calendarCanEdit(){return !!pbAuth()?.record?.id&&['admin','supervisor'].includes(authRole())&&!!activeProject()}
 function diaryEventsForProject(){let p=activeProject();return p?.diaryEvents||[]}
-async function saveDiaryEvents(events){let d=projectsData(),p=d.items[d.active];if(!p)throw new Error('Select a project first.');p.diaryEvents=events;if(p._pocketbase){await pbRequest('/api/collections/projects/records/'+encodeURIComponent(p.id),{method:'PATCH',body:JSON.stringify({site_diary_json:JSON.stringify(events)})})}saveProjectsData(d);renderDashboardDiary()}
+function resetDiaryEditor(){
+  calendarEditor=null;
+  ['diaryTitle','diaryDate','diaryTime','diaryArea','diaryNotes'].forEach(id=>{if($(id))$(id).value=''});
+  if($('diaryType'))$('diaryType').value='delivery';
+  if($('diaryAdd'))$('diaryAdd').textContent='Add diary event';
+  if($('diaryEditorTitle'))$('diaryEditorTitle').textContent='+ Add Event';
+  if($('diaryCancel'))$('diaryCancel').hidden=true;
+  const form=document.querySelector('.calendar-add-event');if(form)form.open=false;
+  if($('diaryStatus'))$('diaryStatus').textContent='';
+}
+function calendarRecords(raw){
+  const rows=JSON.parse(raw||'[]');if(!Array.isArray(rows))throw new Error('Calendar data is not an event list.');return rows;
+}
+async function refreshSiteDiary(){
+  renderSiteDiary();
+  const p=activeProject(),uid=pbAuth()?.record?.id,version=++calendarReadVersion;
+  if(!p?._pocketbase)return;
+  try{
+    const record=await pbRequest('/api/collections/projects/records/'+encodeURIComponent(p.id)+'?fields=id,site_diary_json',{cache:'no-store'});
+    if(version!==calendarReadVersion||activeProject()?.id!==p.id||pbAuth()?.record?.id!==uid)return;
+    const data=projectsData();if(!data.items[p.id])return;
+    data.items[p.id].diaryEvents=calendarRecords(record.site_diary_json);saveProjectsData(data);renderSiteDiary();
+  }catch(e){if(version===calendarReadVersion&&activeProject()?.id===p.id&&pbAuth()?.record?.id===uid)$('calendarStatus').textContent='Could not refresh Calendar: '+e.message}
+}
+async function saveDiaryEvents(events,projectId=projectsData().active){
+  if(!calendarCanEdit())throw new Error('Only Admins and Supervisors can change calendar events.');
+  const uid=pbAuth()?.record?.id,data=projectsData(),p=data.items[projectId];
+  if(!p||data.active!==projectId)throw new Error('The active project changed. Reopen the event.');
+  ++calendarReadVersion;
+  if(p._pocketbase)await pbRequest('/api/collections/projects/records/'+encodeURIComponent(p.id),{method:'PATCH',body:JSON.stringify({site_diary_json:JSON.stringify(events)})});
+  // Persist only after PocketBase confirms success, and never restore an old account/project snapshot.
+  if(pbAuth()?.record?.id!==uid)return;
+  const latest=projectsData();if(!latest.items[projectId])return;
+  if(latest.active===projectId)++calendarReadVersion;
+  latest.items[projectId].diaryEvents=events;saveProjectsData(latest);
+  if(latest.active===projectId)renderDashboardDiary();
+}
+async function changeDiaryEvent(projectId,eventId,values){
+  if(!calendarCanEdit()||projectsData().active!==projectId)throw new Error('Reopen Calendar in the intended project.');
+  const p=activeProject(),uid=pbAuth()?.record?.id;
+  let events=diaryEventsForProject();
+  if(p._pocketbase){
+    const fresh=await pbRequest('/api/collections/projects/records/'+encodeURIComponent(projectId)+'?fields=id,site_diary_json',{cache:'no-store'});
+    events=calendarRecords(fresh.site_diary_json);
+  }
+  if(pbAuth()?.record?.id!==uid||!calendarCanEdit()||projectsData().active!==projectId)throw new Error('The account or project changed. Reopen the event.');
+  if(eventId&&!events.some(e=>e.id===eventId))throw new Error('This event no longer exists. Refresh Calendar.');
+  const next=eventId?(values?events.map(e=>e.id===eventId?{...e,...values}:e):events.filter(e=>e.id!==eventId)):[values,...events];
+  await saveDiaryEvents(next,projectId);
+}
 function diaryTypeLabel(v){return({delivery:'Delivery',completion:'Completion target',inspection:'Inspection',meeting:'Site meeting',general:'General'})[v]||'General'}
 function allCalendarEvents(){let manual=diaryEventsForProject().map(x=>({...x,source:'diary'}));let deliveries=siteOrdersForProject().filter(x=>x.deliveryEta).map(x=>({id:'order_'+x.id,type:'delivery',title:x.title,date:String(x.deliveryEta).slice(0,10),time:'',area:x.orderArea||'',notes:'Materials & Fixings order'+(x.quantity?' • '+x.quantity:''),source:'order',orderId:x.id}));return [...manual,...deliveries].filter(x=>x.date).sort((a,b)=>(a.date+(a.time||'')).localeCompare(b.date+(b.time||'')))}
-function renderSiteDiary(){let cal=$('siteCalendar'),up=$('diaryUpcoming'),label=$('calendarMonthLabel');if(!cal||!up)return;let p=activeProject();if(!p){cal.innerHTML="<p class='small' style='padding:12px'>Select a project first.</p>";up.innerHTML='';return}let events=allCalendarEvents(),y=calendarCursor.getFullYear(),m=calendarCursor.getMonth();if(label)label.textContent=new Intl.DateTimeFormat(undefined,{month:'long',year:'numeric'}).format(new Date(y,m,1));let first=new Date(y,m,1),start=new Date(y,m,1-first.getDay()),today=new Date(),todayKey=[today.getFullYear(),String(today.getMonth()+1).padStart(2,'0'),String(today.getDate()).padStart(2,'0')].join('-');let heads=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(x=>`<div class='calendar-head'>${x}</div>`).join(''),days='';for(let i=0;i<42;i++){let d=new Date(start);d.setDate(start.getDate()+i);let key=[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-'),ev=events.filter(x=>x.date===key);days+=`<div class='calendar-day ${d.getMonth()!==m?'other':''} ${key===todayKey?'today':''}'><div class='calendar-num'>${d.getDate()}</div>${ev.slice(0,3).map(x=>`<span class='calendar-event ${esc(x.type)}' title='${esc(x.title)}'>${x.time?esc(x.time)+' ':''}${esc(x.title)}</span>`).join('')}${ev.length>3?`<span class='calendar-event'>+${ev.length-3} more</span>`:''}</div>`}cal.innerHTML=heads+days;let now=todayKey,upcoming=events.filter(x=>x.date>=now).slice(0,30);up.innerHTML=upcoming.length?upcoming.map(x=>`<div class='diary-row'><b>${esc(x.date)}${x.time?' • '+esc(x.time):''} — ${esc(x.title)}</b><div class='small'>${esc(diaryTypeLabel(x.type))}${x.area?' • '+esc(x.area):''}${x.source==='order'?' • From Materials & Fixings':''}</div>${x.notes?`<div style='margin-top:4px'>${esc(x.notes)}</div>`:''}${x.source==='diary'&&canManageProject()?`<div class='customise management-controls' style='margin-top:7px'><button class='btn diary-delete' data-id='${esc(x.id)}'>Delete</button></div>`:''}</div>`).join(''):"<p class='small'>No upcoming dates.</p>";up.querySelectorAll('.diary-delete').forEach(b=>b.onclick=async()=>{if(!confirm('Delete this diary event?'))return;try{await saveDiaryEvents(diaryEventsForProject().filter(x=>x.id!==b.dataset.id));renderSiteDiary()}catch(e){alert('Could not delete diary event: '+e.message)}})}
+function calendarEventHtml(event){
+  const editable=event.source==='diary'&&calendarCanEdit();
+  return `<div class='diary-row'><b>${esc(event.date)}${event.time?' • '+esc(event.time):''} — ${esc(event.title)}</b><div class='small'>${esc(diaryTypeLabel(event.type))}${event.area?' • '+esc(event.area):''}${event.source==='order'?' • Historical delivery · read-only':''}</div>${event.notes?`<div class='calendar-event-notes'>${esc(event.notes)}</div>`:''}${editable?`<div class='customise' style='margin-top:7px'><button type='button' class='btn diary-edit' data-id='${esc(event.id)}'>Edit</button><button type='button' class='btn diary-delete' data-id='${esc(event.id)}'>Delete</button></div>`:''}</div>`;
+}
+function startDiaryEdit(id){
+  if(!calendarCanEdit()||calendarSaving)return;
+  const event=diaryEventsForProject().find(e=>e.id===id);if(!event)return;
+  calendarEditor={id,projectId:projectsData().active,userId:pbAuth()?.record?.id};
+  for(const [field,key] of [['diaryTitle','title'],['diaryDate','date'],['diaryTime','time'],['diaryArea','area'],['diaryNotes','notes'],['diaryType','type']])$(field).value=event[key]||'';
+  $('diaryEditorTitle').textContent='Edit Event';$('diaryAdd').textContent='Save changes';$('diaryCancel').hidden=false;$('diaryStatus').textContent='';
+  const form=document.querySelector('.calendar-add-event');form.open=true;form.scrollIntoView({block:'start',behavior:'smooth'});$('diaryTitle').focus();
+}
+function renderSiteDiary(){
+  const cal=$('siteCalendar'),up=$('diaryUpcoming'),label=$('calendarMonthLabel');if(!cal||!up)return;
+  const p=activeProject(),scope=(p?.id||'')+'/'+(pbAuth()?.record?.id||'');
+  if(scope!==calendarScope){calendarScope=scope;calendarSelectedDate='';resetDiaryEditor();$('calendarStatus').textContent='';}
+  const form=document.querySelector('.calendar-add-event');if(form)form.hidden=!calendarCanEdit();
+  if(!calendarCanEdit())resetDiaryEditor();
+  if(!p){cal.innerHTML="<p class='small' style='padding:12px'>Select a project first.</p>";up.innerHTML='';$('calendarSelectedDay').innerHTML='';return}
+  const events=allCalendarEvents(),y=calendarCursor.getFullYear(),m=calendarCursor.getMonth();
+  if(label)label.textContent=new Intl.DateTimeFormat(undefined,{month:'long',year:'numeric'}).format(new Date(y,m,1));
+  const first=new Date(y,m,1),start=new Date(y,m,1-first.getDay()),today=new Date(),dateKey=d=>[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-'),todayKey=dateKey(today);
+  let days='';
+  for(let i=0;i<42;i++){
+    const d=new Date(start);d.setDate(start.getDate()+i);const key=dateKey(d),entries=events.filter(e=>e.date===key);
+    days+=`<div class='calendar-day ${d.getMonth()!==m?'other':''} ${key===todayKey?'today':''}'><button type='button' class='calendar-num calendar-day-select' data-date='${key}' aria-label='View events for ${key}' aria-pressed='${calendarSelectedDate===key}'>${d.getDate()}</button>${entries.slice(0,3).map(e=>`<button type='button' class='calendar-event ${esc(e.type)}' data-date='${key}' title='${esc(e.title)}'>${e.time?esc(e.time)+' ':''}${esc(e.title)}</button>`).join('')}${entries.length>3?`<button type='button' class='calendar-event' data-date='${key}'>+${entries.length-3} more</button>`:''}</div>`;
+  }
+  cal.innerHTML=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(x=>`<div class='calendar-head'>${x}</div>`).join('')+days;
+  const selected=$('calendarSelectedDay');selected.hidden=!calendarSelectedDate;
+  selected.innerHTML=calendarSelectedDate?`<h3>${esc(calendarSelectedDate)}</h3>${events.filter(e=>e.date===calendarSelectedDate).map(calendarEventHtml).join('')||"<p class='small'>No events on this day.</p>"}`:'';
+  const upcoming=events.filter(e=>e.date>=todayKey).slice(0,30);
+  up.innerHTML=upcoming.length?upcoming.map(calendarEventHtml).join(''):"<p class='small'>No upcoming dates.</p>";
+  cal.querySelectorAll('[data-date]').forEach(b=>b.onclick=()=>{calendarSelectedDate=b.dataset.date;renderSiteDiary();selected.scrollIntoView({block:'nearest',behavior:'smooth'})});
+  [selected,up].forEach(root=>{
+    root.querySelectorAll('.diary-edit').forEach(b=>b.onclick=()=>startDiaryEdit(b.dataset.id));
+    root.querySelectorAll('.diary-delete').forEach(b=>b.onclick=async()=>{
+      if(!calendarCanEdit()||calendarSaving||!confirm('Delete this diary event?'))return;
+      const projectId=projectsData().active,uid=pbAuth()?.record?.id;calendarSaving=true;b.disabled=true;
+      try{await changeDiaryEvent(projectId,b.dataset.id,null);if(projectsData().active===projectId&&pbAuth()?.record?.id===uid){if(calendarEditor?.id===b.dataset.id)resetDiaryEditor();renderSiteDiary()}}
+      catch(e){if(projectsData().active===projectId&&pbAuth()?.record?.id===uid)$('calendarStatus').textContent='Could not delete diary event: '+e.message}
+      finally{calendarSaving=false;b.disabled=false}
+    });
+  });
+}
 function renderDashboardDiary(){let el=$('dashboardDiary');if(!el)return;let p=activeProject();if(!p){el.innerHTML="<p class='small'>No current project.</p>";return}let t=new Date(),today=[t.getFullYear(),String(t.getMonth()+1).padStart(2,'0'),String(t.getDate()).padStart(2,'0')].join('-'),rows=allCalendarEvents().filter(x=>x.date>=today).slice(0,6);el.innerHTML=rows.length?rows.map(x=>`<div class='diary-row'><b>${esc(x.date)}${x.time?' • '+esc(x.time):''}</b> — ${esc(x.title)}<div class='small'>${esc(diaryTypeLabel(x.type))}${x.area?' • '+esc(x.area):''}${x.source==='order'?' • Materials & Fixings ETA':''}</div></div>`).join(''):"<p class='small'>No upcoming diary dates or delivery ETAs.</p>"}
-$('diaryAdd')?.addEventListener('click',async()=>{let st=$('diaryStatus'),p=activeProject();if(!p){st.textContent='Select a project first.';return}let title=$('diaryTitle').value.trim(),date=$('diaryDate').value;if(!title||!date){st.textContent='Enter a title and date.';return}let ev={id:newId('diary'),type:$('diaryType').value,title,date,time:$('diaryTime').value,area:$('diaryArea').value.trim(),notes:$('diaryNotes').value.trim(),createdAt:new Date().toISOString(),createdBy:currentUserName()};try{await saveDiaryEvents([ev,...diaryEventsForProject()]);['diaryTitle','diaryDate','diaryTime','diaryArea','diaryNotes'].forEach(id=>$(id).value='');st.textContent='Diary event added to the current project.';calendarCursor=new Date(date+'T12:00:00');renderSiteDiary()}catch(e){st.textContent='Could not save diary event: '+e.message}});
+$('diaryCancel')?.addEventListener('click',resetDiaryEditor);
+document.querySelector('.calendar-add-event')?.addEventListener('toggle',()=>{
+  if(!calendarCanEdit()){resetDiaryEditor();return}
+  if(document.querySelector('.calendar-add-event').open&&!calendarEditor)calendarEditor={id:'',projectId:projectsData().active,userId:pbAuth()?.record?.id};
+});
+$('diaryAdd')?.addEventListener('click',async()=>{
+  if(!calendarCanEdit()||calendarSaving)return;
+  const status=$('diaryStatus'),projectId=projectsData().active,uid=pbAuth()?.record?.id,editor=calendarEditor;
+  if(editor&&(editor.projectId!==projectId||editor.userId!==uid)){resetDiaryEditor();return}
+  const title=$('diaryTitle').value.trim(),date=$('diaryDate').value;
+  if(!title||!date){status.textContent='Enter a title and date.';return}
+  const values={title,date,time:$('diaryTime').value,type:$('diaryType').value,area:$('diaryArea').value.trim(),notes:$('diaryNotes').value.trim()};
+  if(!editor?.id)Object.assign(values,{id:newId('diary'),createdAt:new Date().toISOString(),createdBy:currentUserName()});
+  calendarSaving=true;$('diaryAdd').disabled=true;
+  try{
+    await changeDiaryEvent(projectId,editor?.id||'',values);
+    if(projectsData().active!==projectId||pbAuth()?.record?.id!==uid)return;
+    resetDiaryEditor();calendarCursor=new Date(date+'T12:00:00');calendarSelectedDate=date;renderSiteDiary();$('calendarStatus').textContent=editor?.id?'Event updated.':'Event added.';
+  }catch(e){if(projectsData().active===projectId&&pbAuth()?.record?.id===uid)status.textContent='Could not save diary event: '+e.message}
+  finally{calendarSaving=false;$('diaryAdd').disabled=false}
+});
 $('calendarPrev')?.addEventListener('click',()=>{calendarCursor=new Date(calendarCursor.getFullYear(),calendarCursor.getMonth()-1,1);renderSiteDiary()});$('calendarNext')?.addEventListener('click',()=>{calendarCursor=new Date(calendarCursor.getFullYear(),calendarCursor.getMonth()+1,1);renderSiteDiary()});$('calendarToday')?.addEventListener('click',()=>{calendarCursor=new Date();renderSiteDiary()});
 $('dashboardDiaryOpen')?.addEventListener('click',()=>{openTab('calendar')});
 
@@ -1645,7 +1761,7 @@ async function syncMemberships(){
   let data=await pbRequest('/api/collections/project_members/records?perPage=500');pbMemberships=data.items||[];
 }
 function applyPermissionsUI(){
-  const manage=canManageProject();document.querySelectorAll('.calendar-add-event').forEach(el=>el.style.display=manage?'':'none');document.querySelectorAll('.management-controls').forEach(el=>el.style.display=manage?'':'none');
+  const manage=canManageProject();document.querySelectorAll('.calendar-add-event').forEach(el=>{el.style.display=calendarCanEdit()?'':'none';el.hidden=!calendarCanEdit();if(!calendarCanEdit()){resetDiaryEditor();document.querySelectorAll('.diary-edit,.diary-delete').forEach(b=>b.remove())}});document.querySelectorAll('.management-controls').forEach(el=>el.style.display=manage?'':'none');
   if($('inviteUserPanel'))$('inviteUserPanel').style.display=isGlobalSupervisor()?'':'none';
   if($('inviteRole')){const admin=isAdmin();$('inviteRole').querySelectorAll('option').forEach(o=>{if(o.value!=='joiner')o.hidden=!admin});if(!admin&&$('inviteRole').value!=='joiner')$('inviteRole').value='joiner';}
   ['projectDetailsPanel','addSchedulePanel','projectFileImportsPanel','documentRegisterPanel','projectTeamPanel'].forEach(id=>{let el=$(id);if(el)el.style.display=manage?'':'none'});

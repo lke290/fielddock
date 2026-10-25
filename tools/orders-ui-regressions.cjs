@@ -21,8 +21,13 @@ module.exports=async function ordersUIRegressions(page){
     await saveCurrentSiteNote();checks.push([role+' Notes saves',siteNotesForProject().some(n=>n.title==='Saved note '+role)]);
     openTab('calendar');renderSiteDiary();
     checks.push([role+' Calendar retains meeting and historical delivery',allCalendarEvents().some(e=>e.id==='order_historical-order')&&document.getElementById('diaryUpcoming').textContent.includes('Existing meeting')&&document.querySelectorAll('.calendar-day').length===42]);
-    await saveDiaryEvents([...diaryEventsForProject(),{id:'new-event',title:'New event',date:'2099-01-17',type:'general'}]);renderSiteDiary();
-    checks.push([role+' Calendar saves',diaryEventsForProject().some(e=>e.id==='new-event')]);
+    if(role!=='joiner'){
+     await saveDiaryEvents([...diaryEventsForProject(),{id:'new-event',title:'New event',date:'2099-01-17',type:'general'}]);renderSiteDiary();
+     checks.push([role+' Calendar saves',diaryEventsForProject().some(e=>e.id==='new-event')]);
+    }else{
+     let denied=false;try{await saveDiaryEvents([])}catch(e){denied=true}
+     checks.push(['Joiner Calendar is read-only',denied&&!document.querySelector('.diary-edit,.diary-delete')]);
+    }
     document.getElementById('pjSearch').value='Historical fixing order';await searchProject();
     checks.push([role+' search excludes Orders',!document.getElementById('pjSearchResults').querySelector('[data-site-result]')]);
     document.getElementById('pjSearch').value='Saved note '+role;await searchProject();
