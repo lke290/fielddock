@@ -25,6 +25,15 @@ const server=http.createServer((req,res)=>{
     await page.goto(origin+route);await page.waitForTimeout(300);
     // Normalize the intentionally removed Orders UI in the frozen baseline only.
     if(route==='/baseline.html')await page.evaluate(()=>document.querySelectorAll("#orders,#dashMaterialsTile,#dashboardSiteOrders,option[value='orders']").forEach(el=>{const next=el.nextSibling;if(next?.nodeType===Node.TEXT_NODE&&next.textContent.startsWith('\n'))next.textContent=next.textContent.slice(1);el.remove()}));
+    // Compare unchanged UI against the baseline after applying the reviewed shortcut markup.
+    if(route==='/baseline.html')await page.evaluate(markup=>{
+     const oldGrid=document.querySelector('.dashboard-tile-grid');
+     const outstanding=document.getElementById('dashOutstandingMeta').textContent,diary=document.getElementById('dashDiaryMeta').textContent;
+     const oldLink=document.getElementById('dashCompletionTile'),next=oldLink.nextSibling;
+     if(next?.nodeType===Node.TEXT_NODE&&next.textContent.startsWith('\n'))next.textContent=next.textContent.slice(1);
+     oldLink.remove();oldGrid.outerHTML=markup;
+     document.getElementById('dashOutstandingMeta').textContent=outstanding;document.getElementById('dashDiaryMeta').textContent=diary;
+    },fs.readFileSync(path.join(root,'index.html'),'utf8').match(/<div class='dashboard-tile-grid'[\s\S]*?(?=<button type='button' class='dashboard-wide-link supervisor-only-ui')/)[0].trimEnd());
     const state=await page.evaluate(()=>({
      globals:['openTab','applyAuth','pbFetch','completionHardwareHtml','renderSiteItems'].map(k=>[k,typeof window[k]]),
      elements:[...document.body.querySelectorAll('*')].filter(e=>!['SCRIPT','STYLE','LINK'].includes(e.tagName)).map(e=>{
@@ -34,6 +43,7 @@ const server=http.createServer((req,res)=>{
     assert.deepEqual(errors,[],`${route} runtime errors`);assert.deepEqual(missing,[],`${route} missing resources`);
     snapshots.push(state);
     if(route!=='/baseline.html'){
+     await require('./dashboard-shortcut-regressions.cjs')(page);
      await require('./orders-ui-regressions.cjs')(page);
      await require('./photo-regressions.cjs')(page);
      await require('./photo-session-regressions.cjs')(page);

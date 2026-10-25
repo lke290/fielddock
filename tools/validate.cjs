@@ -42,8 +42,15 @@ function restoreOrdersUI(source){
 }
 assert(!html.includes("value='orders'")&&!html.includes("id='orders'")&&!html.includes("id='dashMaterialsTile'"),'Orders entry points must be removed');
 
+// Normalize the reviewed dashboard shortcut markup and search listener only.
+function restoreDashboardShortcuts(source){
+ const section=/<div class='dashboard-tile-grid'[\s\S]*?(?=<button type='button' class='dashboard-wide-link supervisor-only-ui')/;
+ source=source.replace(section,()=>original.match(section)[0]);
+ return source.replace(/^ byId\('dashSearchTile'\)[^\n]*\n/m,'');
+}
+
 // Only reviewed photo, native door snag and session error-handling changes may differ.
-let compared=restoreOrdersUI(rebuilt).replace(/\/\* Native door snag dialog \*\/[\s\S]*?\/\* End native door snag dialog \*\/\n?/,'');
+let compared=restoreDashboardShortcuts(restoreOrdersUI(rebuilt)).replace(/\/\* Native door snag dialog \*\/[\s\S]*?\/\* End native door snag dialog \*\/\n?/,'');
 // Permit only the exact upload-container selector correction.
 assert.equal(compared.split("inp.closest('.photo-tools, .compact-photo-tools')").length,2);
 compared=compared.replace("inp.closest('.photo-tools, .compact-photo-tools')","inp.closest('.photo-tools')");
