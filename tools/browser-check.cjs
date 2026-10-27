@@ -23,6 +23,7 @@ const server=http.createServer((req,res)=>{
     page.on('request',r=>{if(/\/collections\/orders(?:\/|\?)/.test(r.url()))ordersRequests.push(r.url())});
     page.on('pageerror',e=>errors.push(e.message));page.on('response',r=>{if(r.status()>=400)missing.push(r.url())});
     await page.goto(origin+route);await page.waitForTimeout(300);
+    if(route==='/baseline.html')await page.evaluate(()=>{for(const el of document.querySelectorAll('.top-sub,footer'))el.textContent=el.textContent.replaceAll('v4.19.17','v4.19.18')});
     // Normalize the intentionally removed Orders UI in the frozen baseline only.
     if(route==='/baseline.html')await page.evaluate(()=>document.querySelectorAll("#orders,#dashMaterialsTile,#dashboardSiteOrders,option[value='orders']").forEach(el=>{const next=el.nextSibling;if(next?.nodeType===Node.TEXT_NODE&&next.textContent.startsWith('\n'))next.textContent=next.textContent.slice(1);el.remove()}));
     // Compare unchanged UI against the baseline after applying the reviewed shortcut markup.
@@ -60,6 +61,7 @@ const server=http.createServer((req,res)=>{
      await require('./snag-regressions.cjs')(page);
      await require('./completion-interaction-regressions.cjs')(page);
      await require('./completion-ownership-regressions.cjs')(page);
+     await require('./completion-persistence-regressions.cjs')(page);
     }
     assert.deepEqual(errors,[],`${route} workflow runtime errors`);
     assert.deepEqual(ordersRequests,[],`${route} unnecessary Orders requests`);

@@ -20,7 +20,7 @@ module.exports=async function(page){
     check(canEditCompletionStage(p,{[field]:false},field),'Incomplete allowed '+field);
     check(canEditCompletionStage(p,{[field]:true,owners:{[field]:uid}},field),'Own allowed '+field);
    }
-   const calls=[];pbRequest=async(path,options)=>{calls.push({path,options});return {id:'cloud',frame_fitted:true,frame_completed_by:uid}};
+   const calls=[];pbRequest=async(path,options)=>{calls.push({path,options});return {id:'cloud',...JSON.parse(options.body),frame_completed_by:uid}};
    for(const field of ['frame','door','ironmongery']){
     const c={_pbId:'cloud',frame:true,door:true,ironmongery:true,dates:{frame:'date',door:'date',ironmongery:'date'},owners:{frame:'other'}};
     await savePbCompletion('p','d',c,field);

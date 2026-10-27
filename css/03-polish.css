@@ -68,3 +68,12 @@ button.calendar-event.delivery{border-left:3px solid var(--accent)}
   }
 }
 /* End Site and Tools picker motion */
+
+/* Confirmed completion state and save feedback only */
+#completionList .completion-check{appearance:none;-webkit-appearance:none;box-sizing:border-box;width:16px!important;height:16px;min-width:16px;border:1px solid var(--muted);border-radius:3px;padding:0!important;background:transparent!important;vertical-align:middle;cursor:pointer}
+#completionList .completion-check:checked{border-color:#2563eb!important;background:#2563eb url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='m3 8 3 3 7-7' fill='none' stroke='white' stroke-width='2'/%3E%3C/svg%3E") center/contain no-repeat!important}
+#completionList .completion-check:disabled{opacity:1;cursor:default}
+#completionList .completion-check:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+#completionList .completion-save-status{display:block;font-style:normal;font-size:.72rem;white-space:normal;max-width:240px;color:var(--muted)}
+#completionList .completion-save-error{color:#c2410c}
+/* End confirmed completion state */

@@ -11,7 +11,7 @@ for(const asset of meta.assets){
   new vm.Script(body,{filename:asset.file});
   rebuilt=rebuilt.replace(`<script${asset.attributes} src="${asset.file}"></script>`,()=>`<script${asset.attributes}>${body}</script>`);
  }else{
-  assert(!/url\s*\(/i.test(body),'Relative CSS URLs require rebasing');
+  assert(!/url\s*\((?!["']?data:)/i.test(body),'Relative CSS URLs require rebasing');
   rebuilt=rebuilt.replace(`<link${asset.attributes} rel="stylesheet" href="${asset.file}">`,()=>`<style${asset.attributes}>${body}</style>`);
  }
 }
@@ -63,10 +63,11 @@ function restoreCalendarUI(source){
 
 // Only reviewed photo, native door snag and session error-handling changes may differ.
 let compared=restoreDashboardShortcuts(restoreOrdersUI(restoreCalendarUI(rebuilt))).replace(/\n\/\* Site and Tools picker motion only \*\/[\s\S]*?\/\* End Site and Tools picker motion \*\/\n/,'').replace(/\/\* Native door snag dialog \*\/[\s\S]*?\/\* End native door snag dialog \*\/\n?/,'');
+compared=compared.replaceAll('v4.19.18','v4.19.17').replace(/\n\/\* Confirmed completion state and save feedback only \*\/[\s\S]*?\/\* End confirmed completion state \*\/\n/,'');
 // Permit only the exact upload-container selector correction.
 assert.equal(compared.split("inp.closest('.photo-tools, .compact-photo-tools')").length,2);
 compared=compared.replace("inp.closest('.photo-tools, .compact-photo-tools')","inp.closest('.photo-tools')");
-for(const [start,end] of [['function mapPbCompletion(', 'const IRON_ITEMS='],['function canEditCompletionStage(', 'function fmtDate('],['function mapPbPhoto(', 'function pbPhotoKind('],['const photoRefreshRequests=', 'function bindPhotoControls('],['// Native door snags:', 'function completionState('],['function completionCard(', 'async function renderCompletion('],["async function ensurePbAuth(","window.addEventListener('storage'"]]){
+for(const [start,end] of [['async function renderCompletion(', "\n$('completionSearch')"],['function mapPbCompletion(', 'const IRON_ITEMS='],['function canEditCompletionStage(', 'function fmtDate('],['function mapPbPhoto(', 'function pbPhotoKind('],['const photoRefreshRequests=', 'function bindPhotoControls('],['// Native door snags:', 'function completionState('],['function completionCard(', 'async function renderCompletion('],["async function ensurePbAuth(","window.addEventListener('storage'"]]){
  const baselineStart=start==='function canEditCompletionStage('?'async function saveCompletion(':start==='// Native door snags:'?'async function setSnagResolved(':start==='const photoRefreshRequests='?'async function refreshPhotoUI(':start;
  const a=compared.indexOf(start),b=compared.indexOf(end,a);
  assert(a>=0&&b>a);
