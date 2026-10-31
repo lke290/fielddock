@@ -69,7 +69,7 @@ module.exports=async function(page){
    assert.equal(await input(id,field).evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(37, 99, 235)');
    const box=await input(id,field).boundingBox();assert(box.width<=24&&box.height<=24,'Checkbox remains compact');
    await page.evaluate(()=>completionSaveProbe.reload());assert(await input(id,field).isChecked());
-   assert((await input(id,field).locator('..').textContent()).includes(await page.evaluate(date=>fmtDate(date),row[date])));
+   assert((await input(id,field).locator('..').textContent()).includes(await page.evaluate(date=>attributionStamp(completionAccountId(),date),row[date])));
   }
   assert.equal((await page.evaluate(()=>completionSaveProbe.writes)).length,3,'One write per tap despite token rotation on every request');
   // Own undo survives a reload; failure to undo restores the previous checked/date state.

@@ -23,7 +23,7 @@ const server=http.createServer((req,res)=>{
     page.on('request',r=>{if(/\/collections\/orders(?:\/|\?)/.test(r.url()))ordersRequests.push(r.url())});
     page.on('pageerror',e=>errors.push(e.message));page.on('response',r=>{if(r.status()>=400)missing.push(r.url())});
     await page.goto(origin+route);await page.waitForTimeout(300);
-    if(route==='/baseline.html')await page.evaluate(()=>{for(const el of document.querySelectorAll('.top-sub,footer'))el.textContent=el.textContent.replaceAll('v4.19.17','v4.19.18')});
+    if(route==='/baseline.html')await page.evaluate(()=>{for(const el of document.querySelectorAll('.top-sub,footer'))el.textContent=el.textContent.replaceAll('v4.19.17','v4.20.0')});
     // Normalize the intentionally removed Orders UI in the frozen baseline only.
     if(route==='/baseline.html')await page.evaluate(()=>document.querySelectorAll("#orders,#dashMaterialsTile,#dashboardSiteOrders,option[value='orders']").forEach(el=>{const next=el.nextSibling;if(next?.nodeType===Node.TEXT_NODE&&next.textContent.startsWith('\n'))next.textContent=next.textContent.slice(1);el.remove()}));
     // Compare unchanged UI against the baseline after applying the reviewed shortcut markup.
@@ -42,6 +42,16 @@ const server=http.createServer((req,res)=>{
      fieldStyles.forEach(([id,style])=>{if(style!==null)document.getElementById(id)?.setAttribute('style',style)});
      const sheet=document.createElement('style');sheet.textContent=styles;document.head.append(sheet);applyPermissionsUI();
     },{markup:fs.readFileSync(path.join(root,'index.html'),'utf8').match(/<section id='calendar'[\s\S]*?<\/section>/)[0],styles:fs.readFileSync(path.join(root,'css/03-polish.css'),'utf8').match(/\/\* Interactive project Calendar \*\/[\s\S]*?\/\* End interactive project Calendar \*\//)[0]});
+    // Normalize only the reviewed workflow markup for frozen-baseline style comparison.
+    if(route==='/baseline.html')await page.evaluate(({html,styles})=>{
+     const doc=new DOMParser().parseFromString(html,'text/html');
+     document.getElementById('notes').before(doc.getElementById('todos'),document.createTextNode('\n'));
+     document.getElementById('siteNoteProcess').outerHTML=doc.getElementById('siteNoteProcessKind').closest('label').outerHTML+doc.getElementById('siteNoteProcess').outerHTML;
+     document.querySelector('.site-note-fields').before(doc.getElementById('siteNoteMeta'));
+     document.getElementById('listMenu').innerHTML=doc.getElementById('listMenu').innerHTML;
+     const style=document.createElement('style');style.textContent=styles;document.head.append(style);
+     document.getElementById('siteNoteProcess').style.display='';
+    },{html:fs.readFileSync(path.join(root,'index.html'),'utf8'),styles:fs.readFileSync(path.join(root,'css/19-workflows.css'),'utf8')});
     // Picker option presentation differs by renderer; contents and behaviour have dedicated coverage.
     const state=await page.evaluate(()=>({
      globals:['openTab','applyAuth','pbFetch','completionHardwareHtml','renderSiteItems'].map(k=>[k,typeof window[k]]),

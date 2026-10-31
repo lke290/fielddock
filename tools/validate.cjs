@@ -4,9 +4,13 @@ const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),asse
 const root=path.resolve(__dirname,'..'),read=f=>fs.readFileSync(path.join(root,f),'utf8').replace(/\r\n/g,'\n');
 const meta=JSON.parse(read('baseline/extraction.json')),original=read('baseline/index.html'),html=read('index.html');
 assert.equal(original,cp.execFileSync('git',['show',meta.revision+':index.html'],{cwd:root}).toString().replace(/\r\n/g,'\n'));
-let rebuilt=html;
+const goodCore=cp.execFileSync('git',['show','71794b8:js/01-app-core.js'],{cwd:root}).toString().replace(/\r\n/g,'\n');
+const currentCore=read('js/01-app-core.js');
+for(const [start,end] of [['async function saveCompletion(', 'function fmtDate('],['async function pbCompletionRecords(', 'function completionPayload('],['async function savePbCompletion(', 'const IRON_ITEMS=']])assert.equal(currentCore.slice(currentCore.indexOf(start),currentCore.indexOf(end,currentCore.indexOf(start))),goodCore.slice(goodCore.indexOf(start),goodCore.indexOf(end,goodCore.indexOf(start))),'v4.19.18 persistence unchanged: '+start);
+new vm.Script(read('js/08-workflows.js'));assert(!/url\s*\(/i.test(read('css/19-workflows.css')));
+let rebuilt=html.replaceAll('?v=4.20.0','');
 for(const asset of meta.assets){
- const body=read(asset.file);
+ let body=read(asset.file);if(asset.file==='js/07-site-items-js.js'){new vm.Script(body);body=cp.execFileSync('git',['show','71794b8:'+asset.file],{cwd:root}).toString().replace(/\r\n/g,'\n')}
  if(asset.kind==='script'){
   new vm.Script(body,{filename:asset.file});
   rebuilt=rebuilt.replace(`<script${asset.attributes} src="${asset.file}"></script>`,()=>`<script${asset.attributes}>${body}</script>`);
@@ -15,6 +19,11 @@ for(const asset of meta.assets){
   rebuilt=rebuilt.replace(`<link${asset.attributes} rel="stylesheet" href="${asset.file}">`,()=>`<style${asset.attributes}>${body}</style>`);
  }
 }
+// Restore reviewed workflow markup/Notes/login integration for legacy extraction comparison.
+rebuilt=rebuilt.replace(/<section id='todos'[\s\S]*?<\/section>\n/,'').replace('<option value="todos">To-dos</option>','').replace("<option value='todos'>To-dos</option>",'').replace('<link rel="stylesheet" href="css/19-workflows.css"><script src="js/08-workflows.js"></script>','').replace("<div id='siteNoteMeta' class='small'></div>",'');
+rebuilt=rebuilt.replace(/<label>Process as<select id='siteNoteProcessKind'>[\s\S]*?<\/button>/,"<button type='button' class='btn' id='siteNoteProcess'>Process list</button>");
+for(const prefix of ['async function loadPersonalNotes(){','async function loadProjectNotes(){','function personalNoteWasProcessed(','async function renderSiteNotes(){','function openProjectNote(','async function processSiteNote(){',"    let snags=kind==='iron'"]){const line=goodCore.split('\n').find(x=>x.startsWith(prefix));rebuilt=rebuilt.split('\n').map(x=>x.startsWith(prefix)?line:x).join('\n')}
+rebuilt=rebuilt.replace("const email=normaliseLoginIdentity(document.getElementById('loginEmail').value),password=","const email=document.getElementById('loginEmail').value.trim(),password=").replace("if($('siteNoteProcess'))$('siteNoteProcess').style.display='';","if($('siteNoteProcess'))$('siteNoteProcess').style.display=manage?'':'none';");
 // Restore only the reviewed Orders UI regions for the frozen extraction comparison.
 // Behaviour is checked separately by orders-ui-regressions.cjs.
 function restoreOrdersUI(source){
@@ -63,7 +72,7 @@ function restoreCalendarUI(source){
 
 // Only reviewed photo, native door snag and session error-handling changes may differ.
 let compared=restoreDashboardShortcuts(restoreOrdersUI(restoreCalendarUI(rebuilt))).replace(/\n\/\* Site and Tools picker motion only \*\/[\s\S]*?\/\* End Site and Tools picker motion \*\/\n/,'').replace(/\/\* Native door snag dialog \*\/[\s\S]*?\/\* End native door snag dialog \*\/\n?/,'');
-compared=compared.replaceAll('v4.19.18','v4.19.17').replace(/\n\/\* Confirmed completion state and save feedback only \*\/[\s\S]*?\/\* End confirmed completion state \*\/\n/,'');
+compared=compared.replaceAll('v4.20.0','v4.19.17').replaceAll('v4.19.18','v4.19.17').replace(/\n\/\* Confirmed completion state and save feedback only \*\/[\s\S]*?\/\* End confirmed completion state \*\/\n/,'');
 // Permit only the exact upload-container selector correction.
 assert.equal(compared.split("inp.closest('.photo-tools, .compact-photo-tools')").length,2);
 compared=compared.replace("inp.closest('.photo-tools, .compact-photo-tools')","inp.closest('.photo-tools')");

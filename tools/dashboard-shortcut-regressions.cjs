@@ -22,18 +22,18 @@ module.exports=async function dashboardShortcutRegressions(page){
     document.getElementById('dashOutstandingTile').click();const outstanding=document.querySelector('.panel.active')?.id==='snags'&&await back();
     openTab('dashboard');document.getElementById('dashDiaryTile').click();const diary=document.querySelector('.panel.active')?.id==='calendar'&&await back();
     openTab('dashboard');document.getElementById('dashDrawingsTile').click();const drawings=document.querySelector('.panel.active')?.id==='drawings'&&await back();
-    openTab('dashboard');document.getElementById('dashCompletionTile').click();
+    openTab('dashboard');document.getElementById('dashTodosTile').click();const todos=document.querySelector('.panel.active')?.id==='todos'&&await back();openTab('dashboard');document.getElementById('dashCompletionTile').click();
     for(let i=0;i<40&&!document.getElementById('completionList').textContent.includes('D-TEST');i++)await new Promise(r=>setTimeout(r,5));
     const completionWorks=calls===1&&document.querySelector('.panel.active')?.id==='completion'&&document.getElementById('completionListPanel').open&&document.getElementById('completionList').textContent.includes('D-TEST');
     const completionBack=await back();
-    return {names,balanced,mainSearchPreserved,searchWorks,completionBack,drawingsInGrid:document.getElementById('dashDrawingsTile').parentElement.classList.contains('dashboard-tile-grid'),monochromeDoor:!!document.querySelector("#dashCompletionTile svg[stroke='currentColor']"),outstanding,diary,drawings,completion:completionWorks,unique:document.querySelectorAll('#dashCompletionTile').length===1,noOrders:!document.querySelector("#orders,#dashMaterialsTile,[value='orders']")};
+    return {names,todos,completionBelow:!document.getElementById('dashCompletionTile').parentElement.classList.contains('dashboard-tile-grid'),balanced,mainSearchPreserved,searchWorks,completionBack,drawingsInGrid:document.getElementById('dashDrawingsTile').parentElement.classList.contains('dashboard-tile-grid'),monochromeDoor:!!document.querySelector("#dashCompletionTile svg[stroke='currentColor']"),outstanding,diary,drawings,completion:completionWorks,unique:document.querySelectorAll('#dashCompletionTile').length===1,noOrders:!document.querySelector("#orders,#dashMaterialsTile,[value='orders']")};
    }finally{
     pbAuth=prior.auth;pbRequest=prior.request;pbSharedGuidance=prior.shared;photosFor=prior.photos;pbMemberships=prior.members;renderCompletion=prior.completion;
     if(prior.projects===null)localStorage.removeItem(PROJECTS_KEY);else localStorage.setItem(PROJECTS_KEY,prior.projects);
     document.getElementById('pjSearch').value='';
    }
   },role);
-  assert.deepEqual(result.names,['Outstanding Works','Site Diary','Project Drawings','Door Completion']);
+  assert.deepEqual(result.names,['Outstanding Works','Site Diary','Project Drawings','To-dos']);
   for(const [name,ok] of Object.entries(result))if(name!=='names')assert(ok,role+': '+name);
  }
  console.log('PASS: four equal dashboard tiles in 2x2 order; existing actions and Back from all four; main search preserved for Joiner/Supervisor/Admin.');

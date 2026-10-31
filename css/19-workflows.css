@@ -1,0 +1,6 @@
+/* Workflow additions only; no changes to completion saving or other sections. */
+#todos .todo-card{font-size:.95rem;padding:12px;margin:10px 0}#todos .todo-check{display:flex;gap:10px;align-items:flex-start}#todos .todo-check input{width:20px;height:20px;min-width:20px;padding:0;margin:3px 0;accent-color:#2563eb}#todos small{display:block;font-weight:500;color:var(--muted)}#todos .todo-origin{font-size:.82rem;margin:8px 0}#todos .todo-origin p{white-space:pre-wrap}#todoStatus{white-space:pre-wrap}#todoEditor{margin:16px 0}#todos textarea{box-sizing:border-box;width:100%}#initialsEditor[hidden]{display:none!important}.compact-stage-check .user-stamp{display:inline!important;font-size:inherit!important;font-weight:inherit!important}#dashTodosAssigned{font-size:.72rem;color:var(--muted)}#dashCompletionTile.dashboard-wide-link{margin-top:12px}#siteNoteMeta{padding:6px 0}
+
+.site-item-origin{font-size:.8rem;margin:8px 0}.site-item-origin p{white-space:pre-wrap}
+
+#todos .todo-check>span{min-width:0;overflow-wrap:anywhere}

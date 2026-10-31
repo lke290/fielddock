@@ -18,7 +18,7 @@ module.exports=async function menuMotionRegressions(page){
   assert(supported,'Installed Chromium must exercise the enhanced select picker');
   for(const role of ['admin','supervisor','joiner']){
    await page.evaluate(role=>{pbAuth=()=>({record:{id:'menu-user',role}});pbMemberships=[{project:'menu-fixture',user:'menu-user',role:'joiner'}];applyPermissionsUI();openTab('dashboard')},role);
-   for(const [id,values] of [['listMenu',['notes','snags','calendar']],['siteMenu',['convert','formula','regs']]]){
+   for(const [id,values] of [['listMenu',['notes','todos','snags','calendar']],['siteMenu',['convert','formula','regs']]]){
     const options=await page.locator('#'+id).evaluate(el=>[...el.options].filter(o=>!o.disabled&&!o.hidden).map(o=>o.value));assert.deepEqual(options,values,role+' menu contents unchanged');
     for(const value of values){
      await page.locator('#'+id).click();assert((await picker(id)).open);
