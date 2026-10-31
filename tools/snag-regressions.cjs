@@ -17,7 +17,7 @@ module.exports=async function snagRegressions(page){
   const send=()=>form().onsubmit({preventDefault(){}});
   const addFile=()=>{const dt=new DataTransfer();dt.items.add(new File(['photo'],'snag.jpg',{type:'image/jpeg'}));form().elements.photo.files=dt.files};
   try{
-   projectsData=()=>data;saveProjectsData=d=>{data=d};pbAuth=()=>({record:{id:user}});
+   projectsData=()=>data;saveProjectsData=d=>{data=d};pbAuth=()=>({record:{id:user,role:'supervisor'}});
    window.alert=message=>{throw new Error('Unexpected alert: '+message)};
    renderCompletion=async()=>draw();searchProject=async()=>{};
    pbRequest=async(path,options={})=>{

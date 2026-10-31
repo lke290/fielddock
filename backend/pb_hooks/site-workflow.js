@@ -19,11 +19,11 @@ module.exports.todo=(e,creating)=>tx(e,app=>{
  const incoming=e.record,old=creating?new Record(incoming.collection()):app.findRecordById('todos',incoming.id);let record=incoming;
  if(!creating){record=old.fresh();for(const key of Object.keys(e.requestInfo().body||{})){if(!['description','location','priority','assigned_to','complete','completed_by','completed_at','project','reference','created_by','created','source_note','source_project_note','origin'].includes(key))throw new BadRequestError('Unsupported To-do field.');record.set(key,incoming.get(key))}e.record=record}
  member(app,e,record.getString('project'));
- if(creating){if(record.getBool('complete')||record.getString('source_note')||record.getString('source_project_note')||Object.prototype.hasOwnProperty.call(e.requestInfo().body,'origin'))throw new BadRequestError('Create an incomplete To-do; use Note processing for provenance.');record.set('reference',nextRef(app,'TD'));record.set('created_by',e.auth.id);record.set('completed_by','');record.set('completed_at','')}
+ if(creating){if(!manager(e))throw new ForbiddenError('Only Supervisor/Admin can create To-dos.');if(record.getBool('complete')||record.getString('source_note')||record.getString('source_project_note')||Object.prototype.hasOwnProperty.call(e.requestInfo().body,'origin'))throw new BadRequestError('Create an incomplete To-do; use Note processing for provenance.');record.set('reference',nextRef(app,'TD'));record.set('created_by',e.auth.id);record.set('completed_by','');record.set('completed_at','')}
  else{
   immutable(record,old,['project','reference','created_by','created','source_note','source_project_note','origin']);
   const detailChanged=['description','location','priority','assigned_to'].some(k=>JSON.stringify(record.get(k))!==JSON.stringify(old.get(k)));
-  if(detailChanged&&!manager(e)&&old.getString('created_by')!==e.auth.id)throw new ForbiddenError('Only the creator or management can edit task details.');
+  if(detailChanged&&!manager(e))throw new ForbiddenError('Only Supervisor/Admin can edit or assign To-dos.');
   const stageChanged=['complete','completed_by','completed_at'].some(k=>JSON.stringify(record.get(k))!==JSON.stringify(old.get(k)));
   if(stageChanged){
    if(!manager(e)&&((old.getString('assigned_to')&&old.getString('assigned_to')!==e.auth.id)||(record.getString('assigned_to')&&record.getString('assigned_to')!==e.auth.id)))throw new ForbiddenError('This To-do is assigned to another user.');
@@ -56,11 +56,20 @@ module.exports.snagRefs=(e,creating)=>{
  const fields=e.record.collection().name==='projects'?['site_lists_json','general_snags_json']:['snags_json'];
  const incoming=e.record,changed=fields.filter(k=>creating?!!incoming.getString(k):incoming.getString(k)!==incoming.original().getString(k));
  tx(e,app=>{let old=null;if(!creating){old=app.findRecordById(incoming.collection().name,incoming.id);for(const key of changed)if(old.getString(key)!==incoming.original().getString(key))throw new BadRequestError('This Snag list changed. Refresh and retry.');const fresh=old.fresh();for(const key of Object.keys(e.requestInfo().body||{})){if(!fresh.collection().fields.getByName(key)){if(fields.includes(key.replace(/[:+-].*$/,'')))throw new BadRequestError('Replace the Snag list explicitly.');continue}fresh.set(key,incoming.get(key))}e.record=fresh;}for(const key of changed){const previous=array(creating?'[]':old.getString(key)),rows=array(e.record.getString(key));
+  if(!manager(e)&&rows.length!==previous.length)throw new ForbiddenError('Only Supervisor/Admin can create or remove Snags.');
+  const seen=new Set();
   for(const [index,row] of rows.entries()){
-   if(key==='site_lists_json'&&(row.orderType||row.noteType))continue;
+   if(key==='site_lists_json'&&(row.orderType||row.noteType)){if(!manager(e)){const match=previous.findIndex((x,i)=>!seen.has(i)&&JSON.stringify(x)===JSON.stringify(row));if(match<0)throw new ForbiddenError('Cannot bypass Snag permissions using a legacy item type.');seen.add(match);}continue;}
    const fingerprint=x=>[x.source,x.item,x.description||x.title,x.location].join('|');
    const old=previous.find(x=>row.id?x.id===row.id:fingerprint(x)===fingerprint(row));
    const done=x=>['complete','Resolved'].includes(x.status),dateKey=key==='site_lists_json'?'completedAt':'resolvedAt';
+   if(!manager(e)){
+    if(!old)throw new ForbiddenError('Only Supervisor/Admin can create Snags.');
+    const match=previous.indexOf(old);if(seen.has(match))throw new ForbiddenError('Cannot replace a Snag with a duplicate.');seen.add(match);
+    const audit=new Set(['status','resolvedAt','completedAt','completedById','completedBy','updatedAt','reference','createdById','createdAt','origin','source_note','source_collection']);
+    const content=x=>Object.fromEntries(Object.entries(x).filter(([k])=>!audit.has(k)));
+    if(JSON.stringify(content(row))!==JSON.stringify(content(old)))throw new ForbiddenError('Only Supervisor/Admin can edit Snag details.');
+   }
    if(old){
     // Provenance is a server snapshot, not an editable part of Snag content.
     for(const field of ['origin','source_note','source_collection','createdAt']){
@@ -96,6 +105,7 @@ module.exports.snagRefs=(e,creating)=>{
  }e.next()});
 };
 module.exports.process=e=>{
+ if(!manager(e))throw new ForbiddenError('Only Supervisor/Admin can process Notes into project work.');
  let result;tx(e,app=>{
   const body=e.requestInfo().body,collection=body.note_collection||'personal_notes';if(!['personal_notes','project_notes'].includes(collection))throw new BadRequestError('Invalid note collection.');const shared=collection==='project_notes',note=app.findRecordById(collection,e.request.pathValue('note')),project=note.getString('project'),kind=body.kind;
   member(app,e,project);if(shared){if(!e.hasSuperuserAuth()&&!app.canAccessRecord(note,e.requestInfo(),note.collection().viewRule))throw new ForbiddenError('Cannot read this project note.');if(!manager(e)&&note.getString('author')!==e.auth.id)throw new ForbiddenError('Only the author or management can process this shared note.')}else if(note.getString('user')!==e.auth.id)throw new ForbiddenError('Only the note creator can process this private note.');if(!['todo','snag'].includes(kind))throw new BadRequestError('Choose To-do or Snag.');

@@ -4,3 +4,9 @@
 .site-item-origin{font-size:.8rem;margin:8px 0}.site-item-origin p{white-space:pre-wrap}
 
 #todos .todo-check>span{min-width:0;overflow-wrap:anywhere}
+
+/* Focused v4.20.1 role visibility and accessible drawing tap target. */
+#todoNew[hidden],#todoEditor[hidden],#siteNoteProcess[hidden],#siteNoteProcessControl[hidden]{display:none!important}
+.drawing-primary{display:block;width:100%;padding:0;border:0;border-radius:0;background:transparent;color:inherit;text-align:left;font:inherit;cursor:pointer;box-shadow:none}
+.drawing-primary:focus-visible{outline:2px solid var(--fd-orange,#f47b20);outline-offset:4px}
+.drawing-primary .drawing-meta{display:block;margin-top:6px}

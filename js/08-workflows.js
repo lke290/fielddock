@@ -31,9 +31,11 @@ async function projectPeople(projectId){
 }
 function normaliseLoginIdentity(value){const v=String(value||'').trim();return v.includes('@')?v:v.toLowerCase().replace(/\s+/g,'-')}
 let todoRows=[],todoScope='',todoRead=0,todoBusy=new Set(),todoEditing='',todoLoaded=false,todoLoadError='';
-function workflowScope(){return completionAccountId()+'/'+(activeProject()?.id||'')}
+let workflowAccountEpoch=0,workflowAccountId=completionAccountId();
+function canManageWork(){return ['admin','supervisor'].includes(authRole())}
+function workflowScope(){return workflowAccountEpoch+'/'+completionAccountId()+'/'+(activeProject()?.id||'')}
 function todoCanComplete(row){const uid=completionAccountId();if(!uid)return false;if(['admin','supervisor'].includes(authRole()))return true;if(row.assigned_to&&row.assigned_to!==uid)return false;return !row.complete||row.completed_by===uid}
-function todoCanEdit(row){return ['admin','supervisor'].includes(authRole())||row.created_by===completionAccountId()}
+function todoCanEdit(row){return canManageWork()}
 function todoStatus(message){if($('todoStatus'))$('todoStatus').textContent=message}
 function renderTodoCounts(){
  const current=todoScope===workflowScope()?todoRows:[],open=current.filter(x=>!x.complete);if(activeProject()?._pocketbase&&(!todoLoaded||todoScope!==workflowScope())){if($('dashTodosMeta'))$('dashTodosMeta').textContent=todoLoadError?'To-dos unavailable':'Loading To-dos…';if($('dashTodosAssigned'))$('dashTodosAssigned').textContent='';return}
@@ -49,10 +51,11 @@ async function refreshTodos(){
 }
 function todoCard(row){
  const busy=todoBusy.has(row.id),origin=row.origin||{};
- return `<div class='result todo-card' data-todo='${esc(row.id)}'><label class='todo-check'><input type='checkbox' data-todo-check='${esc(row.id)}' ${row.complete?'checked':''} ${busy||!todoCanComplete(row)?'disabled':''}><span><b>${esc(row.reference||'Legacy To-do')}</b> ${esc(row.description)}<small>${esc(row.location||'')} · ${esc(row.priority)}${row.assigned_to?' · Assigned to '+esc(userLabel(row.assigned_to)):' · Unassigned'}</small></span></label><div class='small'>Created ${userStampHtml(row.created_by,row.created)}${row.complete?` · Completed ${userStampHtml(row.completed_by,row.completed_at)}`:''}${busy?' · Saving…':''}</div>${origin.note_id?`<details class='todo-origin'><summary>From ${esc(origin.reference||'Note')} · <span data-user-name='${esc(origin.created_by||'')}'>${esc(userLabel(origin.created_by))}</span></summary><p>${esc(origin.text||'')}</p><small>Original ${esc(origin.created_at||'')} · ${esc(origin.location||'')} · Note ${esc(origin.note_id)}</small></details>`:''}${todoCanEdit(row)?`<button type='button' class='btn todo-edit' data-id='${esc(row.id)}' ${busy?'disabled':''}>Edit</button>`:''}</div>`;
+ return `<div class='result todo-card' data-todo='${esc(row.id)}'><label class='todo-check'><input type='checkbox' data-todo-check='${esc(row.id)}' ${row.complete?'checked':''} ${busy||!todoCanComplete(row)?'disabled':''}><span><b>${esc(row.reference||'Legacy To-do')}</b> ${esc(row.description)}<small>${esc(row.location||'')} · ${esc(row.priority)}${row.assigned_to?' · Assigned to '+esc(userLabel(row.assigned_to)):' · Unassigned'}</small></span></label><div class='small'>Created ${userStampHtml(row.created_by,row.created)}${row.complete?` · Completed ${userStampHtml(row.completed_by,row.completed_at)}`:''}${busy?' · Saving…':''}</div>${origin.note_id?`<details class='todo-origin'><summary>From ${esc(origin.reference||'Note')} · <span data-user-name='${esc(origin.created_by||'')}'>${esc(userLabel(origin.created_by))}</span></summary><p>${esc(origin.text||'')}</p><small>Original ${esc(fmtDate(origin.created_at||''))} · ${esc(origin.location||'')} · Note ${esc(origin.note_id)}</small></details>`:''}${todoCanEdit(row)?`<button type='button' class='btn todo-edit' data-id='${esc(row.id)}' ${busy?'disabled':''}>Edit</button>`:''}</div>`;
 }
 function renderTodos(){
  if(!$('todoList'))return;
+ applyWorkPermissions();
  const rows=todoScope===workflowScope()?todoRows:[],rank={Urgent:0,Important:1,Normal:2};
  $('todoList').innerHTML=rows.filter(x=>!x.complete).sort((a,b)=>rank[a.priority]-rank[b.priority]).map(todoCard).join('')||(todoLoaded?"<p class='small'>No outstanding To-dos.</p>":"<p class='small'>Waiting for the stored To-do list. A connection is required.</p>");
  $('todoHistory').innerHTML=rows.filter(x=>x.complete).map(todoCard).join('')||"<p class='small'>No completed To-dos.</p>";
@@ -65,6 +68,7 @@ function renderTodos(){
  renderTodoCounts();
 }
 async function saveTodoChange(row,payload){
+ if(Object.keys(payload).some(k=>!['complete','completed_by','completed_at'].includes(k))&&!canManageWork()){todoStatus('Only Supervisor/Admin can edit To-dos.');return}
  if(!row){todoStatus('This To-do is no longer available. Refresh the project.');return}if(todoBusy.has(row.id))return;
  const scope=workflowScope();todoBusy.add(row.id);renderTodos();todoStatus('Saving…');
  try{
@@ -73,9 +77,10 @@ async function saveTodoChange(row,payload){
   if(!saved?.id||('complete' in payload&&(saved.complete!==payload.complete||(saved.complete&&(!saved.completed_by||!saved.completed_at)))))throw Error('The server did not confirm this change.');
   todoRead++;todoRows=todoRows.map(x=>x.id===saved.id?saved:x);todoStatus('Saved.');
  }catch(error){if(workflowScope()===scope)todoStatus('Save failed; previous confirmed state retained. '+error.message)}
- finally{todoBusy.delete(row.id);if(workflowScope()===scope)renderTodos()}
+ finally{if(workflowScope()===scope){todoBusy.delete(row.id);renderTodos()}}
 }
 async function openTodoEditor(row=null){
+ if(!canManageWork())return;
  const scope=workflowScope();todoEditing=row?.id||'';
  $('todoDescription').value=row?.description||'';$('todoLocation').value=row?.location||'';$('todoPriority').value=row?.priority||'Normal';
  $('todoEditor').hidden=false;$('todoEditorTitle').textContent=row?'Edit To-do':'New To-do';
@@ -84,7 +89,7 @@ async function openTodoEditor(row=null){
 }
 $('todoNew')?.addEventListener('click',()=>openTodoEditor());$('todoCancel')?.addEventListener('click',()=>{$('todoEditor').hidden=true;todoEditing=''});
 $('todoSave')?.addEventListener('click',async()=>{
- const p=activeProject(),scope=workflowScope(),button=$('todoSave');if(button.disabled)return;
+ const p=activeProject(),scope=workflowScope(),button=$('todoSave');if(button.disabled||!canManageWork())return;
  const payload={description:$('todoDescription').value.trim(),location:$('todoLocation').value.trim(),priority:$('todoPriority').value,assigned_to:$('todoAssigned').value};
  if(!payload.description){todoStatus('Enter a task description.');return}
  button.disabled=true;todoStatus('Saving…');
@@ -96,19 +101,20 @@ $('todoSave')?.addEventListener('click',async()=>{
 });
 let noteProcessing=false;
 async function processNoteWorkflow(){
- if(noteProcessing)return;noteProcessing=true;const p=activeProject(),uid=completionAccountId(),button=$('siteNoteProcess');button.disabled=true;
+ if(!canManageWork())return;
+ if(noteProcessing)return;noteProcessing=true;const p=activeProject(),uid=completionAccountId(),scope=workflowScope(),button=$('siteNoteProcess');button.disabled=true;
  try{
   if(!p?._pocketbase)throw Error('Note processing requires a connected PocketBase project.');
   const kind=$('siteNoteProcessKind').value,note=await saveCurrentSiteNote();if(!note)return;
-  if(activeProject()?.id!==p.id||completionAccountId()!==uid)throw Error('Project or account changed.');
+  if(workflowScope()!==scope||activeProject()?.id!==p.id||completionAccountId()!==uid)throw Error('Project or account changed.');
   const result=await pbRequest('/api/fielddock/notes/'+encodeURIComponent(note.id)+'/process',{method:'POST',body:JSON.stringify({kind})});
-  if(activeProject()?.id!==p.id||completionAccountId()!==uid)return;
+  if(workflowScope()!==scope||activeProject()?.id!==p.id||completionAccountId()!==uid)return;
   await renderSiteNotes();
   if(kind==='todo'){openTab('todos');await refreshTodos()}
-  else{const cloud=await pbRequest('/api/collections/projects/records/'+p.id);if(activeProject()?.id!==p.id||completionAccountId()!==uid)return;const d=projectsData();d.items[p.id].siteItems=JSON.parse(cloud.site_lists_json||'[]');saveProjectsData(d);openTab('snags');$('currentSiteListPanel').open=true;await renderSiteItems();const card=document.querySelector('[data-site-item="'+CSS.escape(result.id)+'"]');if(card)card.open=true}
+  else{const cloud=await pbRequest('/api/collections/projects/records/'+p.id);if(workflowScope()!==scope||activeProject()?.id!==p.id||completionAccountId()!==uid)return;const d=projectsData();d.items[p.id].siteItems=JSON.parse(cloud.site_lists_json||'[]');saveProjectsData(d);openTab('snags');$('currentSiteListPanel').open=true;await renderSiteItems();const card=document.querySelector('[data-site-item="'+CSS.escape(result.id)+'"]');if(card)card.open=true}
   $('siteNoteStatus').textContent=(result.existing?'Already processed: ':'Processed: ')+(result.reference||result.id);
- }catch(error){openSiteNoteEditor();$('siteNoteStatus').textContent='Processing failed; note retained. '+error.message}
- finally{noteProcessing=false;button.disabled=false}
+ }catch(error){if(workflowScope()===scope){openSiteNoteEditor();$('siteNoteStatus').textContent='Processing failed; note retained. '+error.message}}
+ finally{if(workflowScope()===scope){noteProcessing=false;button.disabled=false}}
 }
 const attributionRenderCompletion=renderCompletion;
 renderCompletion=async function(){await attributionRenderCompletion();const p=activeProject();if(p?._pocketbase)void projectPeople(p.id)};
@@ -136,7 +142,7 @@ searchProject=async function(){const scope=workflowScope();await workflowSearch(
 const workflowProjectNote=openProjectNote;
 openProjectNote=function(id){
  workflowProjectNote(id);const note=projectNotesCache.find(x=>x.id===id),viewer=$('projectNoteViewer');if(!note||!viewer)return;
- if(!['admin','supervisor'].includes(authRole())&&note.author!==completionAccountId())return;
+ if(!canManageWork())return;
  const controls=document.createElement('div');controls.className='customise';
  controls.innerHTML=note.processedKind?`<span class='small'>Processed as ${esc(note.processedKind)} · ${esc(note.processedTarget)}</span>`:`<label>Process as<select><option value='todo'>To-do</option><option value='snag'>Snag</option></select></label><button type='button' class='btn'>Process note</button>`;
  viewer.append(controls);const button=controls.querySelector('button');if(!button)return;
@@ -149,3 +155,35 @@ openProjectNote=function(id){
   }catch(error){if($('projectNoteActionStatus'))$('projectNoteActionStatus').textContent='Processing failed; note retained. '+error.message}finally{button.disabled=false}
  };
 };
+
+// Work-management UI uses the same global roles as the server hooks.
+function applyWorkPermissions(){
+ const manage=canManageWork();
+ for(const id of ['todoNew','siteNoteProcess','siteNoteProcessControl','siteListImportPanel'])if($(id))$(id).hidden=!manage;
+ if($('siteListImportPanel'))$('siteListImportPanel').style.display=manage?'':'none';
+ const importCard=$('snagFile')?.closest('.card');if(importCard)importCard.hidden=!manage;
+ if(!manage){$('todoEditor').hidden=true;todoEditing='';document.querySelectorAll('.todo-edit,.compact-report-snag').forEach(el=>el.remove())}
+}
+const workPermissions=applyPermissionsUI;
+applyPermissionsUI=function(){workPermissions();applyWorkPermissions()};
+function resetAccountNavigation(){
+ workflowAccountEpoch++;workflowAccountId=completionAccountId();todoRead++;
+ todoRows=[];todoScope='';todoLoaded=false;todoLoadError='';todoEditing='';todoBusy.clear();noteProcessing=false;
+ $('todoEditor').hidden=true;$('todoList').innerHTML='';$('todoHistory').innerHTML='';$('todoCompletedCount').textContent='0';$('initialsUser').innerHTML='';for(const id of ['todoDescription','todoLocation','initialsOverride'])$(id).value='';$('todoAssigned').innerHTML='<option value="">Unassigned</option>';$('todoPriority').value='Normal';$('todoSave').disabled=false;todoStatus('');
+ personalNotesCache=[];projectNotesCache=[];clearSiteNoteEditor();closeSiteNoteEditor();$('siteNoteMeta').textContent='';$('siteNoteProcess').disabled=false;$('siteNoteList').innerHTML='';$('projectNoteViewer')?.remove();
+ attributionPeople.clear();attributionRequests.clear();completionDoorOpen.clear();completionGlobalFilter=null;
+ for(const dialog of document.querySelectorAll('dialog')){if(dialog.open)dialog.close();dialog.remove()}
+ for(const modal of document.querySelectorAll('.fd-delete-modal')){modal.hidden=true;modal.onclick=null;modal.querySelectorAll('input').forEach(el=>el.value='');modal.querySelectorAll('button').forEach(el=>el.onclick=null)}
+ for(const id of ['siteItemPhotoCameraInput','siteItemPhotoExistingInput']){const input=$(id);if(input){input.value='';delete input.dataset.siteItemId}}
+ for(const key of ['fielddockPendingSiteItemPhoto','fielddockOpenSiteItem'])sessionStorage.removeItem(key);
+ for(const id of ['todoEditor','siteNotesPanel','siteListImportPanel'])$(id)?.querySelectorAll('input,textarea,select').forEach(el=>{if(el.tagName==='SELECT')el.selectedIndex=0;else el.value=''});
+ $('snagFile')?.closest('.card')?.querySelectorAll('input,textarea').forEach(el=>el.value='');
+ $('pjSearch').value='';$('pjSearchResults').hidden=true;$('pjSearchResults').innerHTML='';
+ siteListImportDraft=[];siteListImportNoteSource='';siteListImportSourceNote=null;snagDraft=[];
+ $('siteListImportPreviewArea').innerHTML='';$('snagPreviewArea').innerHTML='';$('siteListImportConfirm').disabled=true;$('snagConfirm').disabled=true;
+ if(typeof resetDiaryEditor==='function')resetDiaryEditor();
+ openTab('dashboard');window.dispatchEvent(new Event('fielddock-account-navigation-reset'));applyWorkPermissions();
+}
+const workApplyAuth=applyAuth;
+applyAuth=function(){if(completionAccountId()!==workflowAccountId)resetAccountNavigation();workApplyAuth()};
+applyWorkPermissions();

@@ -23,7 +23,7 @@ const server=http.createServer((req,res)=>{
     page.on('request',r=>{if(/\/collections\/orders(?:\/|\?)/.test(r.url()))ordersRequests.push(r.url())});
     page.on('pageerror',e=>errors.push(e.message));page.on('response',r=>{if(r.status()>=400)missing.push(r.url())});
     await page.goto(origin+route);await page.waitForTimeout(300);
-    if(route==='/baseline.html')await page.evaluate(()=>{for(const el of document.querySelectorAll('.top-sub,footer'))el.textContent=el.textContent.replaceAll('v4.19.17','v4.20.0')});
+    if(route==='/baseline.html')await page.evaluate(()=>{for(const el of document.querySelectorAll('.top-sub,footer'))el.textContent=el.textContent.replaceAll('v4.19.17','v4.20.1')});
     // Normalize the intentionally removed Orders UI in the frozen baseline only.
     if(route==='/baseline.html')await page.evaluate(()=>document.querySelectorAll("#orders,#dashMaterialsTile,#dashboardSiteOrders,option[value='orders']").forEach(el=>{const next=el.nextSibling;if(next?.nodeType===Node.TEXT_NODE&&next.textContent.startsWith('\n'))next.textContent=next.textContent.slice(1);el.remove()}));
     // Compare unchanged UI against the baseline after applying the reviewed shortcut markup.
@@ -51,6 +51,8 @@ const server=http.createServer((req,res)=>{
      document.getElementById('listMenu').innerHTML=doc.getElementById('listMenu').innerHTML;
      const style=document.createElement('style');style.textContent=styles;document.head.append(style);
      document.getElementById('siteNoteProcess').style.display='';
+     document.getElementById('snagFile').closest('.card').hidden=true;
+     document.getElementById('siteListImportPanel').hidden=true;
     },{html:fs.readFileSync(path.join(root,'index.html'),'utf8'),styles:fs.readFileSync(path.join(root,'css/19-workflows.css'),'utf8')});
     // Picker option presentation differs by renderer; contents and behaviour have dedicated coverage.
     const state=await page.evaluate(()=>({
