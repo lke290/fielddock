@@ -41,13 +41,36 @@ module.exports=async function(page){
    photoFailure=true;doc=await run('frame');check(doc.querySelector('section').textContent.includes('Could not load linked photographs')&&!doc.querySelector('section').textContent.includes('No linked photographs'),'Photo lookup error is distinct from no evidence');photoFailure=false;
    fileFailure=true;doc=await run('frame');check(doc.querySelector('section').textContent.includes('Linked photograph could not be loaded')&&!doc.querySelector('section').textContent.includes('No linked photographs'),'Linked missing/unreadable files are not reported as absent associations');fileFailure=false;
    const knownName=users[0].name;users[0].name='';const username='retired-user';users[0].username=username;doc=await run('frame');check(doc.querySelector('td:nth-child(3)').textContent===username,'Username fallback resolves the exact stored ID');users[0].name=knownName;
-   completions[0].frame_completed_by='missing-user-id';doc=await run('frame');check(doc.querySelector('td:nth-child(3)').textContent==='Unknown user (missing-user-id)','Unresolvable nonblank ID remains explicitly unknown');completions[0].frame_completed_by=U;
-   completions.push(completion('duplicate-completion',A));doc=await run('frame');check(doc.body.textContent.includes('Duplicate completion records')&&!doc.querySelector('section'),'Ambiguous duplicate completion records fail honestly');completions.pop();
+   completions[0].frame_completed_by='missing-user-id';doc=await run('frame');check(doc.querySelector('td:nth-child(3)').textContent==='Unknown user','Unresolvable nonblank ID remains explicitly unknown');completions[0].frame_completed_by=U;
+   // A conflict on another door must never suppress known B04 evidence or imply any completion for the conflicted door.
+   const conflict={...completion('conflicting-other-record',B),frame_fitted:false,door_hung:false,ironmongery_fitted:false};completions.push(conflict);
+   for(const [kind,expectedUser] of [['frame','luke'],['door','Door Person'],['iron','Iron Person']]){
+    const requestStart=requests.length;doc=await run(kind);const cards=[...doc.querySelectorAll('section')],unambiguous=cards[0],unresolved=cards[1];
+    check(doc.querySelector('body>.report-conflict').textContent.includes('1 door has conflicting completion records and requires review.'),'Singular project conflict warning '+kind);
+    check(unresolved.classList.contains('completion-conflict')&&unresolved.textContent.includes('Completion record conflict — manual review required'),'Door-level unresolved warning '+kind);
+    check(!unresolved.querySelector('table,img')&&!unresolved.textContent.includes('Other Door Person')&&!unresolved.textContent.includes('2026-10-30'),'Conflicted door has no selected status/owner/date/photos '+kind);
+    check(unambiguous.querySelector('td:nth-child(3)').textContent===expectedUser&&unambiguous.querySelectorAll('img').length>0,'Known B04 evidence survives unrelated door conflict '+kind);
+    check(!requests.slice(requestStart).some(path=>path.includes('/door_photos/')&&decodeURIComponent(path).includes('schedule_record="'+B+'"')),'Conflicted door photos are not queried or inferred '+kind);
+    check(!doc.body.textContent.includes('conflicting-other-record')&&!doc.body.textContent.includes(B)&&!doc.body.textContent.includes(P),'No internal IDs in normal conflict report '+kind);
+    check(doc.querySelector('.meta').textContent.includes('3 unambiguous doors'),'Conflicted doors excluded honestly from totals '+kind);
+   }
+   completions.push(completion('conflicting-historical-record','historical'));doc=await run('frame');
+   check(doc.querySelector('body>.report-conflict').textContent.includes('2 doors have conflicting completion records and require review.'),'Plural warning identifies all conflicted doors');
+   check(doc.querySelectorAll('.completion-conflict').length===2&&doc.querySelector('body>.report-conflict ul').children.length===2,'Every conflicted door listed exactly once');
+   window.__completionConflictReportHtml=html;
+   completions.push(completion('third-conflicting-record',B));doc=await run('frame');check(doc.querySelectorAll('.completion-conflict').length===2,'Three records remain one unresolved door, not three door conflicts');completions.pop();completions.pop();completions.pop();
+   doc=await run('frame');check(!doc.querySelector('.report-conflict,.completion-conflict'),'No duplicates produces normal report with no warning');
+   completions.push(completion('identical-duplicate',A));doc=await run('frame');check(doc.querySelector('section').classList.contains('completion-conflict'),'Even apparently identical duplicates are not automatically reconciled');completions.pop();
    switchOnFile=true;doc=await run('frame');check(doc.body.textContent.includes('Project or account changed')&&!doc.querySelector('section'),'Account switch aborts/clears partial report evidence');switchOnFile=false;actor='report-generator';
    const cloud=project;project={...cloud,_pocketbase:false,records:[{id:A,door:'Local legacy door'}],completion:{[A]:{frame:true,dates:{frame:'2026-10-30'}}}};photosFor=async()=>[{id:'local-photo',projectId:P,recordId:A,kind:'Frame fitted',blob:new Blob(['<svg xmlns="http://www.w3.org/2000/svg" width="2" height="2"/>'],{type:'image/svg+xml'})}];doc=await run('frame');check(doc.querySelectorAll('img').length===1&&doc.querySelector('td:nth-child(3)').textContent==='Not recorded','Local legacy Blob evidence preserved; historical owner never guessed');project=cloud;photosFor=saved.photosFor;
    check(files.every(url=>url.startsWith(PB_BASE+'/api/files/')),'Uses persistent PocketBase file URLs only, no filename/caption door matching');
    return out;
   }finally{Object.assign(window,saved);window.open=savedOpen}
  });
- assert(results.length>45);console.log('PASS: completion-report cloud/local evidence, all stages, exact project/door/owner isolation, historical unknowns, failed reads, duplicate records and account changes.');return results;
+ const report=await page.context().newPage();try{
+  await report.setContent(await page.evaluate(()=>window.__completionConflictReportHtml));
+  for(const media of ['screen','print']){await report.emulateMedia({media});const warning=report.locator('body>.report-conflict');assert(await warning.isVisible());assert.equal(await report.locator('.completion-conflict').count(),2);const style=await warning.evaluate(el=>({border:parseFloat(getComputedStyle(el).borderTopWidth),weight:parseInt(getComputedStyle(el).fontWeight),display:getComputedStyle(el).display}));assert(style.border>=2&&style.weight>=700&&style.display!=='none');assert.equal(await report.locator('.completion-conflict table,.completion-conflict img').count(),0);results.push('Obvious bordered/bold conflict warnings and withheld evidence in '+media)}
+  const pdf=await report.pdf({format:'A4'});assert(pdf.subarray(0,4).toString()==='%PDF');results.push('Conflict report generates print/PDF output');
+ }finally{await report.close();await page.evaluate(()=>delete window.__completionConflictReportHtml)}
+ assert(results.length>45);console.log('PASS: completion-report evidence/isolation, unresolved door conflicts, unaffected doors, screen/print/PDF warnings, all stages and account changes.');return results;
 };

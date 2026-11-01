@@ -1592,7 +1592,7 @@ async function completionReportPhotoDataUrl(photo,check){
 function completionReportUser(c,field,people){
   if(!c[field])return '—';
   const id=c.owners?.[field];if(typeof id!=='string'||!id.trim())return 'Not recorded';
-  const user=people.get(id);return user?.name||user?.username||'Unknown user ('+id+')';
+  const user=people.get(id);return user?.name||user?.username||'Unknown user';
 }
 async function buildCompletionReport(kind){
   let p=activeProject();if(!p)return;
@@ -1607,16 +1607,23 @@ async function buildCompletionReport(kind){
   const projectId=p.id||projectsData().active,userId=completionAccountId();
   const check=()=>{if(projectsData().active!==projectId||completionAccountId()!==userId)throw Error('Project or account changed. Generate the report again.')};
   try{
-  const people=new Map(),completions=new Map();
+  const people=new Map(),completions=new Map(),conflicts=new Set();
   if(p._pocketbase){
     const rows=await pbCompletionRecords(projectId);check();
-    for(const row of rows){if(row.project!==projectId)continue;if(completions.has(row.schedule_record))throw Error('Duplicate completion records. Refresh and check this door before reporting.');completions.set(row.schedule_record,mapPbCompletion(row))}
+    const candidates=new Map();
+    for(const row of rows){if(row.project!==projectId)continue;const group=candidates.get(row.schedule_record)||[];group.push(row);candidates.set(row.schedule_record,group)}
+    for(const [recordId,group] of candidates){if(group.length===1)completions.set(recordId,mapPbCompletion(group[0]));else conflicts.add(recordId)}
     for(const user of await projectPeople(projectId)){people.set(user.id,user)}check();
   }
   const reportCompletion=r=>p._pocketbase?(completions.get(r.id)||{dates:{},owners:{}}):completionState(p,r);
   let cards=[];
   for(let r of (p.records||[])){
-    check();let c=reportCompletion(r),photos=[],photoError=false;
+    check();
+    if(conflicts.has(r.id)){
+      cards.push(`<section class="completion-conflict"><h2>${esc(r.door||'No door ref')} — ${esc([r.floor,r.room,r.roomNo].filter(Boolean).join(' / '))}</h2><p class="report-conflict">Completion record conflict — manual review required</p><p><b>Stage:</b> ${esc(cfg.label)}. Completion status, completed by, completion date and photographs are withheld pending review.</p></section>`);
+      continue;
+    }
+    let c=reportCompletion(r),photos=[],photoError=false;
     try{photos=await photosFor(projectId,r.id);check()}catch(error){check();photoError=true}
     photos=photos.filter(ph=>ph.projectId===projectId&&ph.recordId===r.id&&pbPhotoKind(ph.kind)===cfg.photoKind);
     let imgs='';
@@ -1625,8 +1632,11 @@ async function buildCompletionReport(kind){
     let snags=kind==='iron'&&Array.isArray(r.snagItems)&&r.snagItems.length?`<h3>Snags / defects</h3><ul>${r.snagItems.map(x=>`<li>${esc(x.status||'Outstanding')} — ${esc(x.reference?x.reference+' · ':'')}${esc(x.description||'')} ${x.item?'(Item '+esc(x.item)+')':''}</li>`).join('')}</ul>`:'';
     cards.push(`<section><h2>${esc(r.door||'No door ref')} — ${esc([r.floor,r.room,r.roomNo].filter(Boolean).join(' / '))}</h2><p><b>Door type:</b> ${esc(r.doorset||'—')} &nbsp; <b>Rating:</b> ${esc(r.rating||'—')}${kind==='iron'?` &nbsp; <b>Ironmongery:</b> ${esc(r.iron||r.ironSet||'—')}`:''}</p><table><tr><th>Stage</th><th>Status</th><th>Completed by</th><th>Completion date</th></tr><tr><td>${cfg.label}</td><td>${c[cfg.field]?'✓ Complete':'Outstanding'}</td><td>${esc(completionReportUser(c,cfg.field,people))}</td><td>${esc(fmtDate(c.dates?.[cfg.field]))}</td></tr></table>${hardware}${snags}${c.note?`<p><b>Note:</b> ${esc(c.note)}</p>`:''}<div class="photos">${imgs||(photoError?'<span>Could not load linked photographs for this report stage.</span>':'<span>No linked photographs for this report stage</span>')}</div><p class="source">Source: ${esc(r.source||'Not recorded')} ${r.doorSourcePage?'p.'+esc(r.doorSourcePage):''}</p></section>`)
   }
-  check();let complete=(p.records||[]).filter(r=>!!reportCompletion(r)[cfg.field]).length;
-  w.document.open();w.document.write(`<!doctype html><html><head><title>${esc(p.name)} ${cfg.title}</title><style>body{font:14px system-ui,sans-serif;color:#111;margin:28px}h1{margin-bottom:4px}.meta{color:#555;margin-bottom:24px}section{break-inside:avoid;border-top:2px solid #333;padding:14px 0}h2{font-size:18px}table{border-collapse:collapse;width:100%;margin:10px 0}th,td{border:1px solid #bbb;padding:6px;text-align:left}.photos{display:flex;gap:8px;flex-wrap:wrap}.photos figure{margin:0;width:150px}.photos img{width:150px;height:120px;object-fit:cover;border:1px solid #aaa}.photos figcaption{font-size:11px}.source{font-size:11px;color:#666}@media print{body{margin:12mm}.no-print{display:none}section{page-break-inside:avoid}}</style>
+  check();const conflictedDoors=(p.records||[]).filter(r=>conflicts.has(r.id));
+  const complete=(p.records||[]).filter(r=>!conflicts.has(r.id)&&!!reportCompletion(r)[cfg.field]).length;
+  const conflictWarning=conflictedDoors.length?`<div class="report-conflict" role="note">${conflictedDoors.length} ${conflictedDoors.length===1?'door has':'doors have'} conflicting completion records and ${conflictedDoors.length===1?'requires':'require'} review.<ul class="report-conflict-list">${conflictedDoors.map(r=>`<li>${esc(r.door||'No door ref')}${r.room?' — '+esc(r.room):''}</li>`).join('')}</ul>These doors remain unresolved and are excluded from the completion totals below.</div>`:'';
+  const completionTotal=conflictedDoors.length?`${complete} of ${(p.records||[]).length-conflictedDoors.length} unambiguous doors complete`:`${complete} of ${(p.records||[]).length} doors complete`;
+  w.document.open();w.document.write(`<!doctype html><html><head><title>${esc(p.name)} ${cfg.title}</title><style>body{font:14px system-ui,sans-serif;color:#111;margin:28px}h1{margin-bottom:4px}.meta{color:#555;margin-bottom:24px}section{break-inside:avoid;border-top:2px solid #333;padding:14px 0}h2{font-size:18px}table{border-collapse:collapse;width:100%;margin:10px 0}th,td{border:1px solid #bbb;padding:6px;text-align:left}.photos{display:flex;gap:8px;flex-wrap:wrap}.photos figure{margin:0;width:150px}.photos img{width:150px;height:120px;object-fit:cover;border:1px solid #aaa}.photos figcaption{font-size:11px}.source{font-size:11px;color:#666}.report-conflict{border:2px solid #873600;padding:12px;color:#111;background:#fff4e5;font-weight:700;break-inside:avoid}.report-conflict-list{font-weight:400}.completion-conflict{border-top:3px solid #873600}@media print{body{margin:12mm}.no-print{display:none}section{page-break-inside:avoid}.report-conflict,.completion-conflict{border-color:#000}}</style>
 <style id="v4186-corrections">
 @media(max-width:700px){
  .top .tabs{display:grid!important;grid-template-columns:calc(50% - 5px) calc(50% - 5px)!important;gap:10px!important;width:100%!important;max-width:100%!important;padding:0!important;margin:0!important;box-sizing:border-box!important;overflow:hidden!important}
@@ -1648,7 +1658,7 @@ async function buildCompletionReport(kind){
  .account-panel,.appearance-panel{padding:10px!important;max-width:min(88vw,320px)!important}.account-panel h3,.appearance-panel h3{margin:0 0 6px!important;font-size:1rem!important}.appearance-row{gap:6px!important;margin-top:7px!important}.appearance-row button{padding:8px!important}
 }
 </style>
-</head><body><div class="no-print"><button onclick="window.print()">Print / Save PDF</button></div><h1>${esc(p.name)} — ${cfg.title}</h1><div class="meta">${esc(p.contractor||'')} ${p.client?'• '+esc(p.client):''}<br>${complete} of ${(p.records||[]).length} doors complete for this report stage • Generated ${esc(new Date().toLocaleString())}</div>${cards.join('')}
+</head><body><div class="no-print"><button onclick="window.print()">Print / Save PDF</button></div><h1>${esc(p.name)} — ${cfg.title}</h1><div class="meta">${esc(p.contractor||'')} ${p.client?'• '+esc(p.client):''}<br>${completionTotal} for this report stage • Generated ${esc(new Date().toLocaleString())}</div>${conflictWarning}${cards.join('')}
 <style id="v4155-regression-fix">
 /* v4.15.6 — preserve dropdown labels on glass active state. */
 .calc-menu.nav-active{color:var(--text)!important;}
