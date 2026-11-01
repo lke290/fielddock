@@ -23,7 +23,7 @@ const server=http.createServer((req,res)=>{
     page.on('request',r=>{if(/\/collections\/orders(?:\/|\?)/.test(r.url()))ordersRequests.push(r.url())});
     page.on('pageerror',e=>errors.push(e.message));page.on('response',r=>{if(r.status()>=400)missing.push(r.url())});
     await page.goto(origin+route);await page.waitForTimeout(300);
-    if(route==='/baseline.html')await page.evaluate(()=>{for(const el of document.querySelectorAll('.top-sub,footer'))el.textContent=el.textContent.replaceAll('v4.19.17','v4.20.2')});
+    if(route==='/baseline.html')await page.evaluate(()=>{for(const el of document.querySelectorAll('.top-sub,footer'))el.textContent=el.textContent.replaceAll('v4.19.17','v4.20.3')});
     // Apply only the reviewed login wording to the frozen visual baseline.
     if(route==='/baseline.html')await page.evaluate(()=>{const input=document.getElementById('loginEmail');input.parentElement.firstChild.textContent='Username';input.placeholder='Enter username';const help=document.querySelector('#loginScreen .login-card p:last-child');help.textContent='Sign in with your FieldDock username and password.'});
     // Normalize the intentionally removed Orders UI in the frozen baseline only.
@@ -75,6 +75,7 @@ const server=http.createServer((req,res)=>{
      await require('./snag-regressions.cjs')(page);
      await require('./completion-interaction-regressions.cjs')(page);
      await require('./completion-ownership-regressions.cjs')(page);
+     await require('./completion-report-regressions.cjs')(page);
      await require('./completion-persistence-regressions.cjs')(page);
     }
     assert.deepEqual(errors,[],`${route} workflow runtime errors`);

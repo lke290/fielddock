@@ -8,8 +8,8 @@ const goodCore=cp.execFileSync('git',['show','71794b8:js/01-app-core.js'],{cwd:r
 const currentCore=read('js/01-app-core.js');
 for(const [start,end] of [['async function saveCompletion(', 'function fmtDate('],['async function pbCompletionRecords(', 'function completionPayload('],['async function savePbCompletion(', 'const IRON_ITEMS=']])assert.equal(currentCore.slice(currentCore.indexOf(start),currentCore.indexOf(end,currentCore.indexOf(start))),goodCore.slice(goodCore.indexOf(start),goodCore.indexOf(end,goodCore.indexOf(start))),'v4.19.18 persistence unchanged: '+start);
 new vm.Script(read('js/08-workflows.js'));assert(!/url\s*\(/i.test(read('css/19-workflows.css')));
-let rebuilt=html.replaceAll('?v=4.20.2','');
-// Normalize only the reviewed v4.20.2 login wording for the frozen baseline.
+let rebuilt=html.replaceAll('?v=4.20.3','');
+// Normalize only the reviewed v4.20.3 login wording for the frozen baseline.
 rebuilt=rebuilt.replace("Username<input id='loginEmail'","Username or email<input id='loginEmail'").replace("placeholder='Enter username'","placeholder='e.g. luke'").replace('Sign in with your FieldDock username and password.</p>','Sign in with your FieldDock username and password. Email login remains available during migration.</p>');
 for(const asset of meta.assets){
  let body=read(asset.file);if(asset.file==='js/07-site-items-js.js'){new vm.Script(body);body=cp.execFileSync('git',['show','71794b8:'+asset.file],{cwd:root}).toString().replace(/\r\n/g,'\n')}
@@ -77,7 +77,11 @@ function restoreCalendarUI(source){
 
 // Only reviewed photo, native door snag and session error-handling changes may differ.
 let compared=restoreDashboardShortcuts(restoreOrdersUI(restoreCalendarUI(rebuilt))).replace(/\n\/\* Site and Tools picker motion only \*\/[\s\S]*?\/\* End Site and Tools picker motion \*\/\n/,'').replace(/\/\* Native door snag dialog \*\/[\s\S]*?\/\* End native door snag dialog \*\/\n?/,'');
-compared=compared.replaceAll('v4.20.2','v4.19.17').replaceAll('v4.19.18','v4.19.17').replace(/\n\/\* Confirmed completion state and save feedback only \*\/[\s\S]*?\/\* End confirmed completion state \*\/\n/,'');
+compared=compared.replaceAll('v4.20.3','v4.19.17').replaceAll('v4.19.18','v4.19.17').replace(/\n\/\* Confirmed completion state and save feedback only \*\/[\s\S]*?\/\* End confirmed completion state \*\/\n/,'');
+// Preserve the frozen report implementation only for baseline reconstruction; test the real report separately.
+const reportStart=compared.indexOf('// Reports embed the same persistently linked evidence'),reportEnd=compared.indexOf("$('exportFrameReport')",reportStart);
+assert(reportStart>=0&&reportEnd>reportStart);
+compared=compared.slice(0,reportStart)+original.slice(original.indexOf('async function buildCompletionReport('),original.indexOf("$('exportFrameReport')"))+compared.slice(reportEnd);
 // Permit only the exact upload-container selector correction.
 assert.equal(compared.split("inp.closest('.photo-tools, .compact-photo-tools')").length,2);
 compared=compared.replace("inp.closest('.photo-tools, .compact-photo-tools')","inp.closest('.photo-tools')");

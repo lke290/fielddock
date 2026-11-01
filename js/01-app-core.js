@@ -1580,6 +1580,20 @@ document.addEventListener('click',async e=>{let b=e.target.closest('[data-comple
 function csvCell(v){v=String(v??'');return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v}
 $('exportCompletionCsv')?.addEventListener('click',()=>{let p=activeProject();if(!p)return;let head=['Door','Floor','Room','Rating','Frame fitted','Frame date','Door hung','Door date','Ironmongery fitted','Ironmongery date','Outstanding snags','Fully complete','Completion date','Note'];let rows=(p.records||[]).map(r=>{let c=completionState(p,r),outstanding=(r.snagItems||[]).filter(x=>x.status!=='Resolved').length;return [r.door,r.floor,r.room,r.rating,c.frame,fmtDate(c.dates?.frame),c.door,fmtDate(c.dates?.door),c.ironmongery,fmtDate(c.dates?.ironmongery),outstanding,c.complete,fmtDate(c.dates?.complete),c.note].map(csvCell).join(',')});let blob=new Blob([[head.map(csvCell).join(','),...rows].join('\n')],{type:'text/csv'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=(p.name||'project').replace(/[^a-z0-9]+/gi,'-').toLowerCase()+'-door-completion.csv';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)});
 async function dataUrl(blob){return new Promise((resolve,reject)=>{let r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=reject;r.readAsDataURL(blob)})}
+// Reports embed the same persistently linked evidence as Door Completion, including cloud files.
+async function completionReportPhotoDataUrl(photo,check){
+  if(!photo._pocketbase){const result=await dataUrl(photo.blob);check();return result}
+  let failure;
+  for(const url of [...new Set([...(photo.urls||[]),photo.url].filter(Boolean))]){
+    try{const response=await pbFetch(url);check();if(!response.ok)throw Error('Photo request failed (HTTP '+response.status+').');const blob=await response.blob();check();if(!blob.size)throw Error('Photo file is empty.');const result=await dataUrl(blob);check();return result}catch(error){check();failure=error}
+  }
+  throw failure||Error('Linked photo has no file URL.');
+}
+function completionReportUser(c,field,people){
+  if(!c[field])return '—';
+  const id=c.owners?.[field];if(typeof id!=='string'||!id.trim())return 'Not recorded';
+  const user=people.get(id);return user?.name||user?.username||'Unknown user ('+id+')';
+}
 async function buildCompletionReport(kind){
   let p=activeProject();if(!p)return;
   const cfg={
@@ -1590,18 +1604,28 @@ async function buildCompletionReport(kind){
   if(!cfg)return;
   let w=window.open('','_blank');if(!w){alert('Allow pop-ups to create the report.');return}
   w.document.write('<p style="font-family:sans-serif;padding:20px">Building report…</p>');
+  const projectId=p.id||projectsData().active,userId=completionAccountId();
+  const check=()=>{if(projectsData().active!==projectId||completionAccountId()!==userId)throw Error('Project or account changed. Generate the report again.')};
+  try{
+  const people=new Map(),completions=new Map();
+  if(p._pocketbase){
+    const rows=await pbCompletionRecords(projectId);check();
+    for(const row of rows){if(row.project!==projectId)continue;if(completions.has(row.schedule_record))throw Error('Duplicate completion records. Refresh and check this door before reporting.');completions.set(row.schedule_record,mapPbCompletion(row))}
+    for(const user of await projectPeople(projectId)){people.set(user.id,user)}check();
+  }
+  const reportCompletion=r=>p._pocketbase?(completions.get(r.id)||{dates:{},owners:{}}):completionState(p,r);
   let cards=[];
   for(let r of (p.records||[])){
-    let c=completionState(p,r),photos=[];
-    try{photos=await photosFor(p.id||projectsData().active,r.id)}catch(e){}
-    photos=photos.filter(ph=>pbPhotoKind(ph.kind)===cfg.photoKind);
+    check();let c=reportCompletion(r),photos=[],photoError=false;
+    try{photos=await photosFor(projectId,r.id);check()}catch(error){check();photoError=true}
+    photos=photos.filter(ph=>ph.projectId===projectId&&ph.recordId===r.id&&pbPhotoKind(ph.kind)===cfg.photoKind);
     let imgs='';
-    for(let ph of photos){try{imgs+=`<figure><img src="${await dataUrl(ph.blob)}"><figcaption>${esc(ph.kind||'Photo')} • ${esc(fmtDate(ph.created))}</figcaption></figure>`}catch(e){}}
+    for(let ph of photos){try{const src=await completionReportPhotoDataUrl(ph,check);imgs+=`<figure><img src="${esc(src)}"><figcaption>${esc(ph.kind||'Photo')} • ${esc(fmtDate(ph.created))}</figcaption></figure>`}catch(error){check();imgs+='<span>Linked photograph could not be loaded.</span>'}}
     let hardware=kind==='iron'&&Array.isArray(r.hardware)&&r.hardware.length?`<h3>Scheduled hardware</h3><ul>${r.hardware.map(x=>`<li>${esc(x.qty||'1')} × ${esc(x.description||x.code||'Hardware item')}</li>`).join('')}</ul>`:'';
     let snags=kind==='iron'&&Array.isArray(r.snagItems)&&r.snagItems.length?`<h3>Snags / defects</h3><ul>${r.snagItems.map(x=>`<li>${esc(x.status||'Outstanding')} — ${esc(x.reference?x.reference+' · ':'')}${esc(x.description||'')} ${x.item?'(Item '+esc(x.item)+')':''}</li>`).join('')}</ul>`:'';
-    cards.push(`<section><h2>${esc(r.door||'No door ref')} — ${esc([r.floor,r.room,r.roomNo].filter(Boolean).join(' / '))}</h2><p><b>Door type:</b> ${esc(r.doorset||'—')} &nbsp; <b>Rating:</b> ${esc(r.rating||'—')}${kind==='iron'?` &nbsp; <b>Ironmongery:</b> ${esc(r.iron||r.ironSet||'—')}`:''}</p><table><tr><th>Stage</th><th>Status</th><th>Date</th></tr><tr><td>${cfg.label}</td><td>${c[cfg.field]?'✓ Complete':'Outstanding'}</td><td>${fmtDate(c.dates?.[cfg.field])}</td></tr></table>${hardware}${snags}${c.note?`<p><b>Note:</b> ${esc(c.note)}</p>`:''}<div class="photos">${imgs||'<span>No linked photographs for this report stage</span>'}</div><p class="source">Source: ${esc(r.source||'Not recorded')} ${r.doorSourcePage?'p.'+esc(r.doorSourcePage):''}</p></section>`)
+    cards.push(`<section><h2>${esc(r.door||'No door ref')} — ${esc([r.floor,r.room,r.roomNo].filter(Boolean).join(' / '))}</h2><p><b>Door type:</b> ${esc(r.doorset||'—')} &nbsp; <b>Rating:</b> ${esc(r.rating||'—')}${kind==='iron'?` &nbsp; <b>Ironmongery:</b> ${esc(r.iron||r.ironSet||'—')}`:''}</p><table><tr><th>Stage</th><th>Status</th><th>Completed by</th><th>Completion date</th></tr><tr><td>${cfg.label}</td><td>${c[cfg.field]?'✓ Complete':'Outstanding'}</td><td>${esc(completionReportUser(c,cfg.field,people))}</td><td>${esc(fmtDate(c.dates?.[cfg.field]))}</td></tr></table>${hardware}${snags}${c.note?`<p><b>Note:</b> ${esc(c.note)}</p>`:''}<div class="photos">${imgs||(photoError?'<span>Could not load linked photographs for this report stage.</span>':'<span>No linked photographs for this report stage</span>')}</div><p class="source">Source: ${esc(r.source||'Not recorded')} ${r.doorSourcePage?'p.'+esc(r.doorSourcePage):''}</p></section>`)
   }
-  let complete=(p.records||[]).filter(r=>!!completionState(p,r)[cfg.field]).length;
+  check();let complete=(p.records||[]).filter(r=>!!reportCompletion(r)[cfg.field]).length;
   w.document.open();w.document.write(`<!doctype html><html><head><title>${esc(p.name)} ${cfg.title}</title><style>body{font:14px system-ui,sans-serif;color:#111;margin:28px}h1{margin-bottom:4px}.meta{color:#555;margin-bottom:24px}section{break-inside:avoid;border-top:2px solid #333;padding:14px 0}h2{font-size:18px}table{border-collapse:collapse;width:100%;margin:10px 0}th,td{border:1px solid #bbb;padding:6px;text-align:left}.photos{display:flex;gap:8px;flex-wrap:wrap}.photos figure{margin:0;width:150px}.photos img{width:150px;height:120px;object-fit:cover;border:1px solid #aaa}.photos figcaption{font-size:11px}.source{font-size:11px;color:#666}@media print{body{margin:12mm}.no-print{display:none}section{page-break-inside:avoid}}</style>
 <style id="v4186-corrections">
 @media(max-width:700px){
@@ -1633,6 +1657,7 @@ html[data-theme='dark'] .calc-menu.nav-active{color:var(--text)!important;}
 
 
 </body></html>`);w.document.close()
+  }catch(error){w.document.open();w.document.write('<p>Could not build completion report: '+esc(error.message)+'</p>');w.document.close()}
 }
 $('exportFrameReport')?.addEventListener('click',()=>buildCompletionReport('frame'));
 $('exportDoorReport')?.addEventListener('click',()=>buildCompletionReport('door'));
