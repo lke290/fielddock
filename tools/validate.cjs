@@ -8,11 +8,28 @@ const goodCore=cp.execFileSync('git',['show','71794b8:js/01-app-core.js'],{cwd:r
 const currentCore=read('js/01-app-core.js');
 for(const [start,end] of [['async function saveCompletion(', 'function fmtDate('],['async function pbCompletionRecords(', 'function completionPayload('],['async function savePbCompletion(', 'const IRON_ITEMS=']])assert.equal(currentCore.slice(currentCore.indexOf(start),currentCore.indexOf(end,currentCore.indexOf(start))),goodCore.slice(goodCore.indexOf(start),goodCore.indexOf(end,goodCore.indexOf(start))),'v4.19.18 persistence unchanged: '+start);
 new vm.Script(read('js/08-workflows.js'));assert(!/url\s*\(/i.test(read('css/19-workflows.css')));
-let rebuilt=html.replaceAll('?v=4.20.4','');
+// Normalize only the reviewed notebook/navigation changes for the older frozen extraction.
+const notebookBaseCore=cp.execFileSync('git',['show','e5018bd:js/01-app-core.js'],{cwd:root}).toString().replace(/\r\n/g,'\n');
+const notebookBaseHtml=cp.execFileSync('git',['show','e5018bd:index.html'],{cwd:root}).toString().replace(/\r\n/g,'\n');
+function notebookCoreForBaseline(source){
+ const start='let activeSiteNoteId=',end="$('siteItemSearch')?.addEventListener";
+ source=source.slice(0,source.indexOf(start))+notebookBaseCore.slice(notebookBaseCore.indexOf(start),notebookBaseCore.indexOf(end))+source.slice(source.indexOf(end));
+ source=source.replace("if(id==='siteNotes'){renderProjectSiteNotes();}",'');
+ source=source.replace("  if(document.querySelector('#siteNotes.panel.active'))await renderProjectSiteNotes();\n",'');
+ const menu=notebookBaseCore.split('\n').find(line=>line.startsWith("$('listMenu').addEventListener"));
+ return source.replace("$('saveLayout').addEventListener",menu+"\n$('saveLayout').addEventListener");
+}
+function notebookHtmlForBaseline(source){
+ const previous=notebookBaseHtml.match(/<section id='notes'[\s\S]*?<\/section>/)[0];
+ source=source.replace(/<section id='notes'[\s\S]*?<\/section>\s*<section id='siteNotes'[\s\S]*?<\/section>/,()=>previous);
+ source=source.replace(/<button[^>]*id='myNotesButton'[^>]*>[\s\S]*?<\/button>/,()=>notebookBaseHtml.match(/<select id='listMenu'[\s\S]*?<\/select>/)[0]);
+ return source.replace(/<button[^>]*id='dashSiteNotesTile'[^>]*>[\s\S]*?<\/button>\n/,'');
+}
+let rebuilt=notebookHtmlForBaseline(html).replaceAll('?v=4.21.0','');
 // Normalize only the reviewed v4.20.4 login wording for the frozen baseline.
 rebuilt=rebuilt.replace("Username<input id='loginEmail'","Username or email<input id='loginEmail'").replace("placeholder='Enter username'","placeholder='e.g. luke'").replace('Sign in with your FieldDock username and password.</p>','Sign in with your FieldDock username and password. Email login remains available during migration.</p>');
 for(const asset of meta.assets){
- let body=read(asset.file);if(asset.file==='js/07-site-items-js.js'){new vm.Script(body);body=cp.execFileSync('git',['show','71794b8:'+asset.file],{cwd:root}).toString().replace(/\r\n/g,'\n')}
+ let body=read(asset.file);if(asset.file==='js/01-app-core.js'){new vm.Script(body);body=notebookCoreForBaseline(body)}if(asset.file==='js/07-site-items-js.js'){new vm.Script(body);body=cp.execFileSync('git',['show','71794b8:'+asset.file],{cwd:root}).toString().replace(/\r\n/g,'\n')}
  if(asset.file==='js/05-navigation-history.js'){new vm.Script(body);body=cp.execFileSync('git',['show','6e23c20:'+asset.file],{cwd:root}).toString().replace(/\r\n/g,'\n')}
  if(asset.kind==='script'){
   new vm.Script(body,{filename:asset.file});
@@ -77,7 +94,7 @@ function restoreCalendarUI(source){
 
 // Only reviewed photo, native door snag and session error-handling changes may differ.
 let compared=restoreDashboardShortcuts(restoreOrdersUI(restoreCalendarUI(rebuilt))).replace(/\n\/\* Site and Tools picker motion only \*\/[\s\S]*?\/\* End Site and Tools picker motion \*\/\n/,'').replace(/\/\* Native door snag dialog \*\/[\s\S]*?\/\* End native door snag dialog \*\/\n?/,'');
-compared=compared.replaceAll('v4.20.4','v4.19.17').replaceAll('v4.19.18','v4.19.17').replace(/\n\/\* Confirmed completion state and save feedback only \*\/[\s\S]*?\/\* End confirmed completion state \*\/\n/,'');
+compared=compared.replaceAll('v4.21.0','v4.19.17').replaceAll('v4.20.4','v4.19.17').replaceAll('v4.19.18','v4.19.17').replace(/\n\/\* Confirmed completion state and save feedback only \*\/[\s\S]*?\/\* End confirmed completion state \*\/\n/,'');
 // Preserve the frozen report implementation only for baseline reconstruction; test the real report separately.
 const reportStart=compared.indexOf('// Reports embed the same persistently linked evidence'),reportEnd=compared.indexOf("$('exportFrameReport')",reportStart);
 assert(reportStart>=0&&reportEnd>reportStart);

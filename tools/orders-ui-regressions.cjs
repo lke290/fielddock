@@ -16,9 +16,7 @@ module.exports=async function ordersUIRegressions(page){
     applyPermissionsUI();refreshProjectSelect();renderDashboard();
     checks.push([role+' has no Orders entry',noOrders()]);
     openTab('orders');checks.push([role+' old route falls back',document.querySelector('.panel.active')?.id==='dashboard']);
-    openTab('notes');await renderSiteNotes();checks.push([role+' Notes loads',document.getElementById('siteNoteList').textContent.includes('Existing note one')]);
-    clearSiteNoteEditor();document.getElementById('siteNoteTitle').value='Saved note '+role;document.getElementById('siteNoteText').value='Note body '+role;
-    await saveCurrentSiteNote();checks.push([role+' Notes saves',siteNotesForProject().some(n=>n.title==='Saved note '+role)]);
+    openTab('notes');await renderSiteNotes();checks.push([role+' My Notes opens',document.querySelector('.panel.active')?.id==='notes']);checks.push([role+' historical project note data retained',siteItemsForProject().some(n=>n.title==='Existing note one')]);
     openTab('calendar');renderSiteDiary();
     checks.push([role+' Calendar retains meeting and historical delivery',allCalendarEvents().some(e=>e.id==='order_historical-order')&&document.getElementById('diaryUpcoming').textContent.includes('Existing meeting')&&document.querySelectorAll('.calendar-day').length===42]);
     if(role!=='joiner'){
@@ -30,7 +28,7 @@ module.exports=async function ordersUIRegressions(page){
     }
     document.getElementById('pjSearch').value='Historical fixing order';await searchProject();
     checks.push([role+' search excludes Orders',!document.getElementById('pjSearchResults').querySelector('[data-site-result]')]);
-    document.getElementById('pjSearch').value='Saved note '+role;await searchProject();
+    document.getElementById('pjSearch').value='Existing note one';await searchProject();
     checks.push([role+' search retains Notes',!!document.getElementById('pjSearchResults').querySelector('[data-site-result]')]);
     document.getElementById('pjSearch').value='';
     await switchActiveProject('two',true);
@@ -48,5 +46,5 @@ module.exports=async function ordersUIRegressions(page){
  });
  for(const [label,ok] of result.checks)assert(ok,label);
  assert(!result.requests.some(p=>/\/collections\/orders\//.test(p)),'No Orders API requests');
- console.log('PASS: all three roles have no Orders UI/routes/search results; Notes save/load/search, Calendar save/legacy deliveries, project switching and historical order preservation.');
+ console.log('PASS: all three roles have no Orders UI/routes/search results; My Notes navigation and legacy note preservation/search, Calendar save/legacy deliveries, project switching and historical order preservation.');
 };

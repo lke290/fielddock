@@ -102,6 +102,7 @@ $('todoSave')?.addEventListener('click',async()=>{
 let noteProcessing=false;
 async function processNoteWorkflow(){
  if(!canManageWork())return;
+ if(personalNoteDraft?.projectId!==activeProject()?.id){$('siteNoteStatus').textContent='Open the original project before processing this note.';return}
  if(noteProcessing)return;noteProcessing=true;const p=activeProject(),uid=completionAccountId(),scope=workflowScope(),button=$('siteNoteProcess');button.disabled=true;
  try{
   if(!p?._pocketbase)throw Error('Note processing requires a connected PocketBase project.');
@@ -123,8 +124,9 @@ openTab=function(id){workflowOpenTab(id);if(id==='todos'){void refreshTodos().ca
 const workflowDashboard=renderDashboard;
 renderDashboard=function(){workflowDashboard();renderTodoCounts();if(activeProject()?._pocketbase)void refreshTodos().catch(()=>{})};
 $('dashTodosTile')?.addEventListener('click',()=>openTab('todos'));
+$('dashSiteNotesTile')?.addEventListener('click',()=>openTab('siteNotes'));
 const workflowLoadNote=loadSiteNote;
-loadSiteNote=function(id){workflowLoadNote(id);const note=personalNotesCache.find(x=>x.id===id);if($('siteNoteMeta'))$('siteNoteMeta').textContent=note?(note.reference||'Legacy Note')+' · '+attributionStamp(note.createdById,note.createdAt)+(note.processedKind?' · Processed as '+note.processedKind:''):''};
+loadSiteNote=function(id){workflowLoadNote(id);const note=personalNotesCache.find(x=>x.id===id);if($('siteNoteMeta'))$('siteNoteMeta').textContent=note?'Created '+fmtDate(note.createdAt)+(note.processedKind?' · Processed as '+note.processedKind:''):''};
 async function refreshInitialsEditor(){
  const manage=['admin','supervisor'].includes(authRole());$('initialsEditor').hidden=!manage;if(!manage)return;
  const scope=workflowScope(),users=await projectPeople(activeProject()?.id);if(scope!==workflowScope())return;
@@ -137,7 +139,7 @@ $('initialsSave')?.addEventListener('click',async()=>{
 // Extend existing search, preserving all current search categories and handlers.
 function appendWorkflowSearch(markup){const box=$('pjSearchResults');box.querySelector(':scope > p.small')?.remove();box.insertAdjacentHTML('beforeend',markup)}
 const workflowSearch=searchProject;
-searchProject=async function(){const scope=workflowScope();await workflowSearch();const q=normaliseSearch($('pjSearch')?.value||'');if(!q||scope!==workflowScope())return;try{await refreshTodos()}catch{}if(scope!==workflowScope()||q!==normaliseSearch($('pjSearch')?.value||''))return;if(activeProject()?._pocketbase)try{const notes=await loadPersonalNotes();if(scope!==workflowScope())return;const hits=notes.filter(n=>normaliseSearch([n.reference,n.title,n.text,n.category].join(' ')).includes(q));if(hits.length){appendWorkflowSearch(`<div class='global-search-group'><h3>Personal notes</h3>${hits.map(n=>searchRow((n.reference||'Note')+' · '+n.title,n.category,`data-workflow-note='${esc(n.id)}'`)).join('')}</div>`);$('pjSearchResults').hidden=false;$('pjSearchResults').querySelectorAll('[data-workflow-note]').forEach(b=>b.onclick=()=>{closeGlobalSearchAfterSelection();openTab('notes');loadSiteNote(b.dataset.workflowNote)})}}catch{}const rows=todoRows.filter(x=>normaliseSearch([x.reference,x.description,x.location,userLabel(x.assigned_to)].join(' ')).includes(q));if(rows.length){appendWorkflowSearch(`<div class='global-search-group'><h3>To-dos</h3>${rows.map(x=>searchRow(x.reference+' · '+x.description,x.location,`data-todo-result='${esc(x.id)}'`)).join('')}</div>`);$('pjSearchResults').hidden=false;$('pjSearchResults').querySelectorAll('[data-todo-result]').forEach(b=>b.onclick=()=>{closeGlobalSearchAfterSelection();openTab('todos')})}};
+searchProject=async function(){const scope=workflowScope();await workflowSearch();const q=normaliseSearch($('pjSearch')?.value||'');if(!q||scope!==workflowScope())return;try{await refreshTodos()}catch{}if(scope!==workflowScope()||q!==normaliseSearch($('pjSearch')?.value||''))return;if(activeProject()?._pocketbase)try{const notes=await loadPersonalNotes();if(scope!==workflowScope())return;const hits=notes.filter(n=>n.project===activeProject()?.id).filter(n=>normaliseSearch([n.reference,n.title,n.text,n.category].join(' ')).includes(q));if(hits.length){appendWorkflowSearch(`<div class='global-search-group'><h3>Personal notes</h3>${hits.map(n=>searchRow((n.reference||'Note')+' · '+n.title,n.category,`data-workflow-note='${esc(n.id)}'`)).join('')}</div>`);$('pjSearchResults').hidden=false;$('pjSearchResults').querySelectorAll('[data-workflow-note]').forEach(b=>b.onclick=()=>{closeGlobalSearchAfterSelection();openTab('notes');loadSiteNote(b.dataset.workflowNote)})}}catch{}const rows=todoRows.filter(x=>normaliseSearch([x.reference,x.description,x.location,userLabel(x.assigned_to)].join(' ')).includes(q));if(rows.length){appendWorkflowSearch(`<div class='global-search-group'><h3>To-dos</h3>${rows.map(x=>searchRow(x.reference+' · '+x.description,x.location,`data-todo-result='${esc(x.id)}'`)).join('')}</div>`);$('pjSearchResults').hidden=false;$('pjSearchResults').querySelectorAll('[data-todo-result]').forEach(b=>b.onclick=()=>{closeGlobalSearchAfterSelection();openTab('todos')})}};
 
 const workflowProjectNote=openProjectNote;
 openProjectNote=function(id){
@@ -150,7 +152,7 @@ openProjectNote=function(id){
   if(button.disabled)return;button.disabled=true;const p=activeProject(),scope=workflowScope(),kind=controls.querySelector('select').value;
   try{
    const result=await pbRequest('/api/fielddock/notes/'+encodeURIComponent(id)+'/process',{method:'POST',body:JSON.stringify({kind,note_collection:'project_notes'})});if(scope!==workflowScope())return;
-   viewer.remove();await renderSiteNotes();
+   viewer.remove();await renderProjectSiteNotes();
    if(kind==='todo'){openTab('todos');await refreshTodos()}else{const cloud=await pbRequest('/api/collections/projects/records/'+p.id);if(scope!==workflowScope())return;const data=projectsData();data.items[p.id].siteItems=JSON.parse(cloud.site_lists_json||'[]');saveProjectsData(data);openTab('snags');$('currentSiteListPanel').open=true;await renderSiteItems()}
   }catch(error){if($('projectNoteActionStatus'))$('projectNoteActionStatus').textContent='Processing failed; note retained. '+error.message}finally{button.disabled=false}
  };
@@ -170,7 +172,7 @@ function resetAccountNavigation(){
  workflowAccountEpoch++;workflowAccountId=completionAccountId();todoRead++;
  todoRows=[];todoScope='';todoLoaded=false;todoLoadError='';todoEditing='';todoBusy.clear();noteProcessing=false;
  $('todoEditor').hidden=true;$('todoList').innerHTML='';$('todoHistory').innerHTML='';$('todoCompletedCount').textContent='0';$('initialsUser').innerHTML='';for(const id of ['todoDescription','todoLocation','initialsOverride'])$(id).value='';$('todoAssigned').innerHTML='<option value="">Unassigned</option>';$('todoPriority').value='Normal';$('todoSave').disabled=false;todoStatus('');
- personalNotesCache=[];projectNotesCache=[];clearSiteNoteEditor();closeSiteNoteEditor();$('siteNoteMeta').textContent='';$('siteNoteProcess').disabled=false;$('siteNoteList').innerHTML='';$('projectNoteViewer')?.remove();
+ $('personalNoteListStatus').textContent='';personalNoteRead++;personalNoteSaving=false;$('siteNoteSave').disabled=false;$('siteNoteDelete').disabled=false;personalNotesCache=[];projectNotesCache=[];clearSiteNoteEditor();closeSiteNoteEditor();$('siteNoteMeta').textContent='';$('siteNoteProcess').disabled=false;$('siteNoteList').innerHTML='';$('projectNoteList').innerHTML='';$('projectNoteViewer')?.remove();
  attributionPeople.clear();attributionRequests.clear();completionDoorOpen.clear();completionGlobalFilter=null;
  for(const dialog of document.querySelectorAll('dialog')){if(dialog.open)dialog.close();dialog.remove()}
  for(const modal of document.querySelectorAll('.fd-delete-modal')){modal.hidden=true;modal.onclick=null;modal.querySelectorAll('input').forEach(el=>el.value='');modal.querySelectorAll('button').forEach(el=>el.onclick=null)}

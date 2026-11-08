@@ -10,3 +10,7 @@ routerAdd('PATCH','/api/fielddock/users/{user}/initials',(e)=>require(__hooks+'/
 routerAdd('POST','/api/fielddock/notes/{note}/process',(e)=>require(__hooks+'/site-workflow.js').process(e),$apis.requireAuth());
 
 onRecordEnrich((e)=>require(__hooks+'/site-workflow.js').legacySnagView(e),'schedule_records');
+
+onRecordDeleteRequest((e)=>require(__hooks+'/personal-notes.js').preventHardDelete(e),'personal_notes');
+
+onRecordDelete((e)=>require(__hooks+'/personal-notes.js').protectProject(e),'projects');

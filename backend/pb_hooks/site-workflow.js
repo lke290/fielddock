@@ -6,8 +6,9 @@ function immutable(record,old,fields){for(const field of fields)if(JSON.stringif
 function assigned(app,project,id){if(id&&!app.findRecordsByFilter('project_members','project={:p} && user={:u}','',1,0,{p:project,u:id}).length)throw new BadRequestError('Assignee must be a project member.');}
 module.exports.note=(e,creating)=>tx(e,app=>{
  const before=creating?null:app.findRecordById(e.record.collection().name,e.record.id);
- if(creating){member(app,e,e.record.getString('project'));e.record.set(e.record.collection().name==='project_notes'?'author':'user',e.auth.id);e.record.set('reference',nextRef(app,'N'));e.record.set('processed_kind','');e.record.set('processed_target','')}
+ if(creating){if(e.record.collection().name!=='personal_notes'||e.record.getString('project'))member(app,e,e.record.getString('project'));e.record.set(e.record.collection().name==='project_notes'?'author':'user',e.auth.id);e.record.set('reference',nextRef(app,'N'));e.record.set('processed_kind','');e.record.set('processed_target','')}
  else{const incoming=e.record,old=before,record=old.fresh();for(const key of Object.keys(e.requestInfo().body||{})){if(!record.collection().fields.getByName(key))throw new BadRequestError('Unsupported Note field.');record.set(key,incoming.get(key))}immutable(record,old,['project','user','author','reference','processed_kind','processed_target']);e.record=record;}
+ if(e.record.collection().name==='personal_notes')require(__hooks+'/personal-notes.js').guard(e,creating,app,before);
  if(e.record.collection().name==='project_notes'){
   const done=e.record.getString('status')==='complete',wasDone=before?.getString('status')==='complete';
   e.record.set('completed_by',done?(wasDone?before.getString('completed_by'):e.auth.id):'');
@@ -108,6 +109,7 @@ module.exports.process=e=>{
  if(!manager(e))throw new ForbiddenError('Only Supervisor/Admin can process Notes into project work.');
  let result;tx(e,app=>{
   const body=e.requestInfo().body,collection=body.note_collection||'personal_notes';if(!['personal_notes','project_notes'].includes(collection))throw new BadRequestError('Invalid note collection.');const shared=collection==='project_notes',note=app.findRecordById(collection,e.request.pathValue('note')),project=note.getString('project'),kind=body.kind;
+  if(!shared&&note.getString('deleted_at'))throw new ForbiddenError('Deleted notes cannot be processed.');
   member(app,e,project);if(shared){if(!e.hasSuperuserAuth()&&!app.canAccessRecord(note,e.requestInfo(),note.collection().viewRule))throw new ForbiddenError('Cannot read this project note.');if(!manager(e)&&note.getString('author')!==e.auth.id)throw new ForbiddenError('Only the author or management can process this shared note.')}else if(note.getString('user')!==e.auth.id)throw new ForbiddenError('Only the note creator can process this private note.');if(!['todo','snag'].includes(kind))throw new BadRequestError('Choose To-do or Snag.');
   if(note.getString('processed_kind')){if(note.getString('processed_kind')!==kind)throw new BadRequestError('This note was already processed differently.');result={kind,id:note.getString('processed_target'),existing:true};return}
   if(!note.getString('reference'))note.set('reference',nextRef(app,'N'));

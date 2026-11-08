@@ -23,7 +23,7 @@ const server=http.createServer((req,res)=>{
     page.on('request',r=>{if(/\/collections\/orders(?:\/|\?)/.test(r.url()))ordersRequests.push(r.url())});
     page.on('pageerror',e=>errors.push(e.message));page.on('response',r=>{if(r.status()>=400)missing.push(r.url())});
     await page.goto(origin+route);await page.waitForTimeout(300);
-    if(route==='/baseline.html')await page.evaluate(()=>{for(const el of document.querySelectorAll('.top-sub,footer'))el.textContent=el.textContent.replaceAll('v4.19.17','v4.20.4')});
+    if(route==='/baseline.html')await page.evaluate(()=>{for(const el of document.querySelectorAll('.top-sub,footer'))el.textContent=el.textContent.replaceAll('v4.19.17','v4.21.0')});
     // Apply only the reviewed login wording to the frozen visual baseline.
     if(route==='/baseline.html')await page.evaluate(()=>{const input=document.getElementById('loginEmail');input.parentElement.firstChild.textContent='Username';input.placeholder='Enter username';const help=document.querySelector('#loginScreen .login-card p:last-child');help.textContent='Sign in with your FieldDock username and password.'});
     // Normalize the intentionally removed Orders UI in the frozen baseline only.
@@ -50,13 +50,22 @@ const server=http.createServer((req,res)=>{
      document.getElementById('notes').before(doc.getElementById('todos'),document.createTextNode('\n'));
      document.getElementById('siteNoteProcess').outerHTML=doc.getElementById('siteNoteProcessKind').closest('label').outerHTML+doc.getElementById('siteNoteProcess').outerHTML;
      document.querySelector('.site-note-fields').before(doc.getElementById('siteNoteMeta'));
-     document.getElementById('listMenu').innerHTML=doc.getElementById('listMenu').innerHTML;
+     if(doc.getElementById('listMenu'))document.getElementById('listMenu').innerHTML=doc.getElementById('listMenu').innerHTML;
      const style=document.createElement('style');style.textContent=styles;document.head.append(style);
      document.getElementById('siteNoteProcess').style.display='';
      document.getElementById('snagFile').closest('.card').hidden=true;
      document.getElementById('siteListImportPanel').hidden=true;
     },{html:fs.readFileSync(path.join(root,'index.html'),'utf8'),styles:fs.readFileSync(path.join(root,'css/19-workflows.css'),'utf8')});
     // Picker option presentation differs by renderer; contents and behaviour have dedicated coverage.
+    // Match only the authorised notebook/navigation markup for the frozen visual comparison.
+    // Baseline interaction handlers are not exercised; current interactions have API/browser coverage.
+    if(route==='/baseline.html')await page.evaluate(html=>{
+     const doc=new DOMParser().parseFromString(html,'text/html');
+     document.getElementById('listMenu').replaceWith(doc.getElementById('myNotesButton'));
+     const oldNotes=document.getElementById('notes'),notes=doc.getElementById('notes');oldNotes.replaceWith(notes);notes.after(document.createTextNode('\n'),doc.getElementById('siteNotes'));
+     const importer=document.getElementById('siteListImportPanel');importer.hidden=true;importer.style.display='none';
+     if(!document.getElementById('dashSiteNotesTile'))document.querySelector('.dashboard-wide-link.supervisor-only-ui').before(doc.getElementById('dashSiteNotesTile'),document.createTextNode('\n'));
+    },fs.readFileSync(path.join(root,'index.html'),'utf8'));
     const state=await page.evaluate(()=>({
      globals:['openTab','applyAuth','pbFetch','completionHardwareHtml','renderSiteItems'].map(k=>[k,typeof window[k]]),
      elements:[...document.body.querySelectorAll('*')].filter(e=>!['SCRIPT','STYLE','LINK'].includes(e.tagName)&&!(e.tagName==='OPTION'&&e.closest('#listMenu,#siteMenu'))).map(e=>{
